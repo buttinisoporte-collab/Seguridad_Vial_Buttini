@@ -1,0 +1,5 @@
+{
+  "name": "Mapa de Riesgo Vial",
+  "description": "Una aplicación web para visualizar y gestionar riesgos viales en rutas de transporte de pasajeros en San Rafael, Mendoza. Permite cargar rutas a través de KML, marcar y tipificar riesgos en el mapa, y generar reportes de riesgo por recorrido.",
+  "requestFramePermissions": []
+}
