@@ -44,6 +44,11 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRi
             {selectedRoute ? (
                  <div className="bg-gray-700 p-4 rounded-lg">
                     <h3 className="text-lg font-semibold text-white mb-1">{selectedRoute.name}</h3>
+                    <div className="flex gap-2 text-[10px] text-sky-400 font-mono uppercase mb-2">
+                        <span>G: {selectedRoute.group}</span>
+                        <span>L: {selectedRoute.line}</span>
+                        <span>S: {selectedRoute.service}</span>
+                    </div>
                     <p className="text-sm text-gray-400 mb-3">{selectedRoute.origin} &rarr; {selectedRoute.destination}</p>
                     
                     <div className="border-t border-gray-600 pt-3">

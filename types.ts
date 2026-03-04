@@ -23,6 +23,9 @@ export interface Route {
     name: string;
     origin: string;
     destination: string;
+    group: string;
+    line: string;
+    service: string;
     // FIX: Changed GeoJSON.FeatureCollection to GeoJSONFeatureCollection to use the type defined in this file.
     geoJson: GeoJSONFeatureCollection | null;
 }

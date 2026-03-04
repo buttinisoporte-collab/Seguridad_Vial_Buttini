@@ -4,23 +4,26 @@ import { X, UploadCloud } from 'lucide-react';
 
 interface AddRouteModalProps {
     onClose: () => void;
-    onAddRoute: (name: string, origin: string, destination: string, kmlFile: File) => void;
+    onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
 }
 
 export const AddRouteModal: React.FC<AddRouteModalProps> = ({ onClose, onAddRoute }) => {
     const [name, setName] = useState('');
     const [origin, setOrigin] = useState('');
     const [destination, setDestination] = useState('');
+    const [group, setGroup] = useState('');
+    const [line, setLine] = useState('');
+    const [service, setService] = useState('');
     const [kmlFile, setKmlFile] = useState<File | null>(null);
     const [error, setError] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name || !origin || !destination || !kmlFile) {
+        if (!name || !origin || !destination || !group || !line || !service || !kmlFile) {
             setError('Todos los campos son obligatorios.');
             return;
         }
-        onAddRoute(name, origin, destination, kmlFile);
+        onAddRoute(name, origin, destination, group, line, service, kmlFile);
         onClose();
     };
 
@@ -44,6 +47,20 @@ export const AddRouteModal: React.FC<AddRouteModalProps> = ({ onClose, onAddRout
                     <div className="mb-4">
                         <label htmlFor="route-name" className="block text-sm font-medium text-gray-300 mb-1">Nombre del Recorrido</label>
                         <input type="text" id="route-name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: Línea 101 - Centro" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label htmlFor="group" className="block text-sm font-medium text-gray-300 mb-1">Grupo</label>
+                            <input type="text" id="group" value={group} onChange={(e) => setGroup(e.target.value)} className="w-full bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: Grupo 1" />
+                        </div>
+                        <div>
+                            <label htmlFor="line" className="block text-sm font-medium text-gray-300 mb-1">Línea</label>
+                            <input type="text" id="line" value={line} onChange={(e) => setLine(e.target.value)} className="w-full bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: 101" />
+                        </div>
+                        <div>
+                            <label htmlFor="service" className="block text-sm font-medium text-gray-300 mb-1">Recorrido/Servicio</label>
+                            <input type="text" id="service" value={service} onChange={(e) => setService(e.target.value)} className="w-full bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: Servicio A" />
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>

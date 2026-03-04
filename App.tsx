@@ -8,8 +8,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type { Route, Risk, RiskType, Position, GeoJSONFeature, GeoJSONLineString } from './types';
 import { Panel } from './components/Panel';
-import { AddRiskModal } from './components/AddRiskModal';
+import { RiskModal } from './components/RiskModal';
 import { MapClickHandler } from './components/MapClickHandler';
+import { Edit2, Trash2 } from 'lucide-react';
 
 // Default map center: San Rafael, Mendoza, Argentina
 const SAN_RAFAEL_CENTER: LatLngExpression = [-34.6175, -68.335];
@@ -41,6 +42,7 @@ const App: React.FC = () => {
     const [risks, setRisks] = useState<Risk[]>(() => JSON.parse(localStorage.getItem('risks') || '[]'));
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50); // in meters
     const [isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
+    const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
     const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     useEffect(() => {
@@ -100,8 +102,25 @@ const App: React.FC = () => {
             setNewRiskPosition(null);
         }
     };
+
+    const handleEditRisk = (riskTypeId: string, description: string) => {
+        if (editingRisk) {
+            setRisks(prev => prev.map(r => 
+                r.id === editingRisk.id 
+                    ? { ...r, riskTypeId, description, associatedRouteIds: findAssociatedRouteIds(r.position) } 
+                    : r
+            ));
+            setEditingRisk(null);
+        }
+    };
+
+    const handleDeleteRisk = (id: string) => {
+        if (window.confirm("¿Está seguro que desea eliminar este riesgo?")) {
+            setRisks(prev => prev.filter(r => r.id !== id));
+        }
+    };
     
-    const handleAddRoute = (name: string, origin: string, destination: string, kmlFile: File) => {
+    const handleAddRoute = (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
@@ -114,6 +133,9 @@ const App: React.FC = () => {
                     name,
                     origin,
                     destination,
+                    group,
+                    line,
+                    service,
                     geoJson,
                 };
                 setRoutes(prev => [...prev, newRoute]);
@@ -180,7 +202,25 @@ const App: React.FC = () => {
                         return (
                              <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
                                 <Popup>
-                                    <div className="font-bold text-lg" style={{ color: riskType.color }}>{riskType.name}</div>
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="font-bold text-lg" style={{ color: riskType.color }}>{riskType.name}</div>
+                                        <div className="flex gap-1">
+                                            <button 
+                                                onClick={() => setEditingRisk(risk)}
+                                                className="p-1 text-gray-400 hover:text-sky-500 transition-colors"
+                                                title="Editar"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteRisk(risk.id)}
+                                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                title="Eliminar"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
                                     <p className="text-gray-700">{risk.description}</p>
                                     {associatedRoutes.length > 0 && (
                                         <div className="mt-2 pt-2 border-t">
@@ -203,10 +243,19 @@ const App: React.FC = () => {
             </main>
             
             {isAddRiskModalOpen && newRiskPosition && (
-                <AddRiskModal
+                <RiskModal
                     riskTypes={riskTypes}
                     onClose={() => setIsAddRiskModalOpen(false)}
-                    onAddRisk={handleAddRisk}
+                    onSave={handleAddRisk}
+                />
+            )}
+
+            {editingRisk && (
+                <RiskModal
+                    riskTypes={riskTypes}
+                    editingRisk={editingRisk}
+                    onClose={() => setEditingRisk(null)}
+                    onSave={handleEditRisk}
                 />
             )}
         </div>

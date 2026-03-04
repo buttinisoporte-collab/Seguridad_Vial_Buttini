@@ -18,7 +18,7 @@ interface PanelProps {
     setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
     proximityDistance: number;
     setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
-    onAddRoute: (name: string, origin: string, destination: string, kmlFile: File) => void;
+    onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
     getRiskType: (id: string) => RiskType | undefined;
 }
 

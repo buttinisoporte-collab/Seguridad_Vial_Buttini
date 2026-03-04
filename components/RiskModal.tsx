@@ -1,22 +1,32 @@
 
-import React, { useState } from 'react';
-import type { RiskType } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { RiskType, Risk } from '../types';
 import { X } from 'lucide-react';
 
-interface AddRiskModalProps {
+interface RiskModalProps {
     riskTypes: RiskType[];
     onClose: () => void;
-    onAddRisk: (riskTypeId: string, description: string) => void;
+    onSave: (riskTypeId: string, description: string) => void;
+    editingRisk?: Risk | null;
 }
 
-export const AddRiskModal: React.FC<AddRiskModalProps> = ({ riskTypes, onClose, onAddRisk }) => {
-    const [selectedRiskTypeId, setSelectedRiskTypeId] = useState<string>(riskTypes.length > 0 ? riskTypes[0].id : '');
-    const [description, setDescription] = useState('');
+export const RiskModal: React.FC<RiskModalProps> = ({ riskTypes, onClose, onSave, editingRisk }) => {
+    const [selectedRiskTypeId, setSelectedRiskTypeId] = useState<string>(
+        editingRisk ? editingRisk.riskTypeId : (riskTypes.length > 0 ? riskTypes[0].id : '')
+    );
+    const [description, setDescription] = useState(editingRisk ? editingRisk.description : '');
+
+    useEffect(() => {
+        if (editingRisk) {
+            setSelectedRiskTypeId(editingRisk.riskTypeId);
+            setDescription(editingRisk.description);
+        }
+    }, [editingRisk]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (selectedRiskTypeId) {
-            onAddRisk(selectedRiskTypeId, description);
+            onSave(selectedRiskTypeId, description);
         }
     };
 
@@ -24,7 +34,9 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({ riskTypes, onClose, 
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
             <div className="bg-gray-800 text-white rounded-lg shadow-xl p-6 w-full max-w-md m-4">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold text-sky-400">Agregar Nuevo Riesgo</h2>
+                    <h2 className="text-2xl font-bold text-sky-400">
+                        {editingRisk ? 'Editar Riesgo' : 'Agregar Nuevo Riesgo'}
+                    </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
                         <X size={24} />
                     </button>
@@ -59,7 +71,7 @@ export const AddRiskModal: React.FC<AddRiskModalProps> = ({ riskTypes, onClose, 
                             Cancelar
                         </button>
                         <button type="submit" className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg">
-                            Agregar Riesgo
+                            {editingRisk ? 'Guardar Cambios' : 'Agregar Riesgo'}
                         </button>
                     </div>
                 </form>
