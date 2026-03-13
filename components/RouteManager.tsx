@@ -1,27 +1,25 @@
 import React, { useState } from 'react';
 import type { Route } from '../types';
 import { AddRouteModal } from './AddRouteModal';
-import { MapPin, PlusCircle, Trash2 } from 'lucide-react';
+import { MapPin, PlusCircle, Trash2, Link as LinkIcon } from 'lucide-react';
 
 interface RouteManagerProps {
-    routes: Route[];
-    setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
+    routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
     onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
-    
     showRisks: boolean; setShowRisks: (v: boolean) => void;
     showIncidents: boolean; setShowIncidents: (v: boolean) => void;
-    
     filterGroup: string; setFilterGroup: (v: string) => void;
     filterLine: string; setFilterLine: (v: string) => void;
     filterService: string; setFilterService: (v: string) => void;
     activeRouteId: string | null; setActiveRouteId: (v: string | null) => void;
+    togglePublicRoute: (id: string) => void; // NUEVO
 }
 
 export const RouteManager: React.FC<RouteManagerProps> = ({ 
     routes, onAddRoute, setRoutes,
     showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService,
-    activeRouteId, setActiveRouteId
+    activeRouteId, setActiveRouteId, togglePublicRoute
 }) => {
     const[isModalOpen, setIsModalOpen] = useState(false);
     
@@ -29,6 +27,19 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
         if(window.confirm("¿Está seguro que desea eliminar este recorrido?")) {
             setRoutes(routes.filter(route => route.id !== id));
             if (activeRouteId === id) setActiveRouteId(null);
+        }
+    };
+
+    const handleShare = (e: React.MouseEvent, route: Route) => {
+        e.stopPropagation();
+        togglePublicRoute(route.id);
+        
+        // Si no era público, ahora lo es, por lo tanto copiamos el enlace generado
+        if (!route.isPublic) {
+            const url = `${window.location.origin}${window.location.pathname}?publicRoute=${route.id}`;
+            navigator.clipboard.writeText(url).then(() => {
+                alert(`Enlace público habilitado y copiado al portapapeles:\n\n${url}\n\nPuede enviarlo a los conductores.`);
+            });
         }
     };
 
@@ -80,7 +91,18 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
                             </div>
                             <p className="text-xs text-gray-400">{route.origin} &rarr; {route.destination}</p>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); deleteRoute(route.id); }} className="text-red-400 hover:text-red-600 p-2 ml-2"><Trash2 size={18} /></button>
+                        <div className="flex items-center ml-2">
+                            <button 
+                                onClick={(e) => handleShare(e, route)} 
+                                className={`p-2 transition-colors ${route.isPublic ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-white'}`}
+                                title={route.isPublic ? "Deshabilitar acceso público" : "Habilitar acceso público a conductores"}
+                            >
+                                <LinkIcon size={18} />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); deleteRoute(route.id); }} className="text-red-400 hover:text-red-600 p-2 ml-1" title="Eliminar recorrido">
+                                <Trash2 size={18} />
+                            </button>
+                        </div>
                     </div>
                 )) : (
                     <div className="text-center py-8 px-4 bg-gray-700 rounded-lg"><MapPin size={40} className="mx-auto text-gray-500" /><p className="mt-2 text-gray-400">No se encontraron recorridos.</p></div>

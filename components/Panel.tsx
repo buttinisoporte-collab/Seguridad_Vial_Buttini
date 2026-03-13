@@ -9,39 +9,26 @@ import { Settings } from './Settings';
 import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon } from 'lucide-react';
 
 interface PanelProps {
-    riskTypes: RiskType[];
-    setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
-    routes: Route[];
-    setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
-    risks: Risk[];
-    setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
-    proximityDistance: number;
-    setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
+    riskTypes: RiskType[]; setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
+    routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
+    risks: Risk[]; setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
+    proximityDistance: number; setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
     onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
     getRiskType: (id: string) => RiskType | undefined;
     
-    activeTab: AppTab;
-    setActiveTab: React.Dispatch<React.SetStateAction<AppTab>>;
-    
-    showRisks: boolean;
-    setShowRisks: React.Dispatch<React.SetStateAction<boolean>>;
-    showIncidents: boolean;
-    setShowIncidents: React.Dispatch<React.SetStateAction<boolean>>;
+    activeTab: AppTab; setActiveTab: React.Dispatch<React.SetStateAction<AppTab>>;
+    showRisks: boolean; setShowRisks: React.Dispatch<React.SetStateAction<boolean>>;
+    showIncidents: boolean; setShowIncidents: React.Dispatch<React.SetStateAction<boolean>>;
 
-    filterGroup: string;
-    setFilterGroup: React.Dispatch<React.SetStateAction<string>>;
-    filterLine: string;
-    setFilterLine: React.Dispatch<React.SetStateAction<string>>;
-    filterService: string;
-    setFilterService: React.Dispatch<React.SetStateAction<string>>;
-    activeRouteId: string | null;
-    setActiveRouteId: React.Dispatch<React.SetStateAction<string | null>>;
+    filterGroup: string; setFilterGroup: React.Dispatch<React.SetStateAction<string>>;
+    filterLine: string; setFilterLine: React.Dispatch<React.SetStateAction<string>>;
+    filterService: string; setFilterService: React.Dispatch<React.SetStateAction<string>>;
+    activeRouteId: string | null; setActiveRouteId: React.Dispatch<React.SetStateAction<string | null>>;
     
-    reportSelectedRouteId: string;
-    setReportSelectedRouteId: React.Dispatch<React.SetStateAction<string>>;
-
-    riskViewerSelectedTypes: string[];
-    setRiskViewerSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
+    reportSelectedRouteId: string; setReportSelectedRouteId: React.Dispatch<React.SetStateAction<string>>;
+    riskViewerSelectedTypes: string[]; setRiskViewerSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
+    
+    togglePublicRoute: (id: string) => void; // NUEVO
 }
 
 export const Panel: React.FC<PanelProps> = ({
@@ -50,7 +37,7 @@ export const Panel: React.FC<PanelProps> = ({
     activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, 
     activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
-    riskViewerSelectedTypes, setRiskViewerSelectedTypes
+    riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute
 }) => {
 
     const renderTabContent = () => {
@@ -64,28 +51,14 @@ export const Panel: React.FC<PanelProps> = ({
                         filterLine={filterLine} setFilterLine={setFilterLine}
                         filterService={filterService} setFilterService={setFilterService}
                         activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId}
+                        togglePublicRoute={togglePublicRoute}
                     />
                 );
-            case 'riskTypes':
-                return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} />;
-            case 'riskViewer':
-                return (
-                     <RiskViewer 
-                        riskTypes={riskTypes} risks={risks} routes={routes}
-                        selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes}
-                     />
-                );
-            case 'reports':
-                return (
-                    <ReportViewer 
-                        routes={routes} risks={risks} getRiskType={getRiskType}
-                        selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId}
-                    />
-                );
-            case 'settings':
-                return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} />;
-            default:
-                return null;
+            case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} />;
+            case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} />;
+            case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
+            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} />;
+            default: return null;
         }
     };
     
@@ -104,18 +77,14 @@ export const Panel: React.FC<PanelProps> = ({
     return (
         <aside className="w-[400px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-2 overflow-y-auto">
-                 <div className="flex items-center text-sky-400 mb-2">
-                    <Map size={32} />
-                </div>
+                 <div className="flex items-center text-sky-400 mb-2"><Map size={32} /></div>
                 <TabButton tabName="routes" icon={<MapPin size={24} />} label="Recorridos" />
                 <TabButton tabName="riskTypes" icon={<AlertTriangle size={24} />} label="Cargar" />
                 <TabButton tabName="riskViewer" icon={<Layers size={24} />} label="Visor" />
                 <TabButton tabName="reports" icon={<FileBarChart size={24} />} label="Reportes" />
                 <TabButton tabName="settings" icon={<SettingsIcon size={24} />} label="Ajustes" />
             </div>
-            <div className="flex-1 p-4 overflow-y-auto">
-                {renderTabContent()}
-            </div>
+            <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
         </aside>
     );
 };

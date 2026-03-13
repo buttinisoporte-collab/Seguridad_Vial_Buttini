@@ -9,7 +9,8 @@ import type { Route, Risk, RiskType, Position, GeoJSONFeature, GeoJSONLineString
 import { Panel } from './components/Panel';
 import { RiskModal } from './components/RiskModal';
 import { MapClickHandler } from './components/MapClickHandler';
-import { Edit2, Trash2, Folder, Video, Image as ImageIcon } from 'lucide-react';
+import { PublicRouteViewer } from './components/PublicRouteViewer';
+import { Edit2, Trash2, Folder, Video, AlertCircle } from 'lucide-react';
 
 export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'settings';
 
@@ -20,7 +21,7 @@ const createRiskIcon = (color: string) => {
     return new Icon({
         iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`,
         iconSize:[32, 32],
-        iconAnchor: [16, 32],
+        iconAnchor:[16, 32],
         popupAnchor:[0, -32]
     });
 };
@@ -46,25 +47,25 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
         } else {
             map.setView(SAN_RAFAEL_CENTER, 13);
         }
-    }, [routes, risks, map]);
+    },[routes, risks, map]);
     return null;
 };
 
 const App: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<AppTab>('routes');
+    const[activeTab, setActiveTab] = useState<AppTab>('routes');
     
     // Toggles Globales
     const[showRisks, setShowRisks] = useState(true);
-    const [showIncidents, setShowIncidents] = useState(true);
+    const[showIncidents, setShowIncidents] = useState(true);
 
     const [filterGroup, setFilterGroup] = useState('');
     const [filterLine, setFilterLine] = useState('');
-    const [filterService, setFilterService] = useState('');
+    const[filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const [riskTypes, setRiskTypes] = useState<RiskType[]>(() => {
+    const[riskTypes, setRiskTypes] = useState<RiskType[]>(() => {
         const saved = localStorage.getItem('riskTypes');
         return saved ? JSON.parse(saved) :[
             { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false },
@@ -76,11 +77,15 @@ const App: React.FC = () => {
     });
     
     const[routes, setRoutes] = useState<Route[]>(() => JSON.parse(localStorage.getItem('routes') || '[]'));
-    const [risks, setRisks] = useState<Risk[]>(() => JSON.parse(localStorage.getItem('risks') || '[]'));
+    const[risks, setRisks] = useState<Risk[]>(() => JSON.parse(localStorage.getItem('risks') || '[]'));
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
     const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+
+    // --- INTERCEPTOR DE URL PÚBLICA ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const publicRouteId = urlParams.get('publicRoute');
 
     useEffect(() => {
         setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null);
@@ -91,9 +96,30 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('risks', JSON.stringify(risks)); }, [risks]);
     useEffect(() => { localStorage.setItem('proximityDistance', proximityDistance.toString()); }, [proximityDistance]);
     
+    // Si hay un ID en la URL, mostrar el Visor Público
+    if (publicRouteId) {
+        const publicRoute = routes.find(r => r.id === publicRouteId);
+        if (publicRoute && publicRoute.isPublic) {
+            const associatedRisks = risks.filter(risk => risk.associatedRouteIds.includes(publicRouteId));
+            return <PublicRouteViewer route={publicRoute} risks={associatedRisks} riskTypes={riskTypes} />;
+        } else {
+            return (
+                <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col">
+                    <AlertCircle size={64} className="text-red-500 mb-4" />
+                    <h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1>
+                    <p className="text-gray-400">El recorrido solicitado no existe o su enlace público ha sido revocado.</p>
+                </div>
+            );
+        }
+    }
+
+    const togglePublicRoute = (id: string) => {
+        setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r));
+    };
+
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
         const associatedIds: string[] =[];
-        const riskPoint = [position.lng, position.lat];
+        const riskPoint =[position.lng, position.lat];
         routes.forEach(route => {
             if (route.geoJson) {
                 const features = route.geoJson.features.filter(
@@ -145,10 +171,9 @@ const App: React.FC = () => {
                 const kmlContent = event.target?.result as string;
                 const dom = new DOMParser().parseFromString(kmlContent, 'application/xml');
                 const geoJson = kml(dom);
-                const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson };
+                const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
                 setRoutes(prev =>[...prev, newRoute]);
                 
-                // ASIGNAR AUTOMÁTICAMENTE a los riesgos/incidentes existentes
                 setRisks(prevRisks => prevRisks.map(risk => ({
                     ...risk,
                     associatedRouteIds: [...new Set([...risk.associatedRouteIds, ...findAssociatedRouteIds(risk.position)])]
@@ -162,7 +187,6 @@ const App: React.FC = () => {
     
     const getRiskType = (id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id);
 
-    // 1. Filtrado de Riesgos Base por Toggles Globales
     const baseVisibleRisks = useMemo(() => {
         return risks.filter(risk => {
             const rt = getRiskType(risk.riskTypeId);
@@ -173,7 +197,6 @@ const App: React.FC = () => {
         });
     }, [risks, riskTypes, showRisks, showIncidents]);
 
-    // 2. Filtrado de Rutas según Tab Actual
     const visibleRoutes = useMemo(() => {
         if (activeTab === 'routes') {
             if (activeRouteId) return routes.filter(r => r.id === activeRouteId);
@@ -196,7 +219,6 @@ const App: React.FC = () => {
         return routes;
     },[routes, activeTab, filterGroup, filterLine, filterService, activeRouteId, reportSelectedRouteId, riskViewerSelectedTypes, baseVisibleRisks]);
 
-    // 3. Filtrado Final de Riesgos basado en las Rutas Visibles y el Tab
     const visibleRisks = useMemo(() => {
         if (activeTab === 'routes') {
             const visibleRouteIds = new Set(visibleRoutes.map(r => r.id));
@@ -227,6 +249,7 @@ const App: React.FC = () => {
                 activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId}
                 reportSelectedRouteId={reportSelectedRouteId} setReportSelectedRouteId={setReportSelectedRouteId}
                 riskViewerSelectedTypes={riskViewerSelectedTypes} setRiskViewerSelectedTypes={setRiskViewerSelectedTypes}
+                togglePublicRoute={togglePublicRoute} // NUEVA PROP
             />
             <main className="flex-1 h-full relative">
                  <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
@@ -273,7 +296,6 @@ const App: React.FC = () => {
                                     </div>
                                     <p className="text-gray-700 text-sm mb-2">{risk.description}</p>
                                     
-                                    {/* Mostrar Media Adjunta */}
                                     <div className="flex gap-2 items-center mb-2">
                                         {risk.images && risk.images.length > 0 && risk.images.map((img, idx) => img && (
                                             <a key={idx} href={img} target="_blank" rel="noreferrer" title="Ver imagen">

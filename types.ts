@@ -7,7 +7,7 @@ export interface RiskType {
     id: string;
     name: string;
     color: string;
-    isIncident: boolean; // NUEVO: Para distinguir riesgo de siniestro
+    isIncident: boolean;
 }
 
 export interface Risk {
@@ -16,7 +16,6 @@ export interface Risk {
     riskTypeId: string;
     description: string;
     associatedRouteIds: string[];
-    // NUEVO: Multimedia
     images: string[];
     videoUrl?: string;
     driveUrl?: string;
@@ -30,7 +29,7 @@ export interface GeoJSONFeature<T> {
 
 export interface GeoJSONLineString {
     type: "LineString";
-    coordinates: [number, number][]; // [lng, lat]
+    coordinates: [number, number][]; //[lng, lat]
 }
 
 export interface GeoJSONGeometryCollection {
@@ -52,4 +51,5 @@ export interface Route {
     line: string;
     service: string;
     geoJson: RouteGeoJSON;
+    isPublic?: boolean; // NUEVO: Determina si el recorrido tiene link público habilitado
 }
