@@ -1,4 +1,3 @@
-
 export interface Position {
     lat: number;
     lng: number;
@@ -8,6 +7,7 @@ export interface RiskType {
     id: string;
     name: string;
     color: string;
+    isIncident: boolean; // NUEVO: Para distinguir riesgo de siniestro
 }
 
 export interface Risk {
@@ -16,6 +16,31 @@ export interface Risk {
     riskTypeId: string;
     description: string;
     associatedRouteIds: string[];
+    // NUEVO: Multimedia
+    images: string[];
+    videoUrl?: string;
+    driveUrl?: string;
+}
+
+export interface GeoJSONFeature<T> {
+    type: "Feature";
+    properties: any;
+    geometry: T;
+}
+
+export interface GeoJSONLineString {
+    type: "LineString";
+    coordinates: [number, number][]; // [lng, lat]
+}
+
+export interface GeoJSONGeometryCollection {
+    type: "GeometryCollection";
+    geometries: any[];
+}
+
+export interface RouteGeoJSON {
+    type: "FeatureCollection";
+    features: GeoJSONFeature<GeoJSONLineString | GeoJSONGeometryCollection>[];
 }
 
 export interface Route {
@@ -26,28 +51,5 @@ export interface Route {
     group: string;
     line: string;
     service: string;
-    // FIX: Changed GeoJSON.FeatureCollection to GeoJSONFeatureCollection to use the type defined in this file.
-    geoJson: GeoJSONFeatureCollection | null;
-}
-
-// Simplified GeoJSON types for our use case
-export interface GeoJSONPoint {
-    type: 'Point';
-    coordinates: [number, number];
-}
-
-export interface GeoJSONLineString {
-    type: 'LineString';
-    coordinates: [number, number][];
-}
-
-export interface GeoJSONFeature<T extends GeoJSONPoint | GeoJSONLineString> {
-    type: 'Feature';
-    geometry: T;
-    properties: Record<string, any>;
-}
-
-export interface GeoJSONFeatureCollection {
-    type: 'FeatureCollection';
-    features: GeoJSONFeature<any>[];
+    geoJson: RouteGeoJSON;
 }
