@@ -1,19 +1,19 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { Route, Risk, RiskType } from '../types';
-import { FileBarChart, Search } from 'lucide-react';
+import { FileBarChart } from 'lucide-react';
 
 interface ReportViewerProps {
     routes: Route[];
     risks: Risk[];
     getRiskType: (id: string) => RiskType | undefined;
+    selectedRouteId: string;
+    setSelectedRouteId: (id: string) => void;
 }
 
-export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRiskType }) => {
-    const [selectedRouteId, setSelectedRouteId] = useState<string>('');
+export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRiskType, selectedRouteId, setSelectedRouteId }) => {
 
     const selectedRouteRisks = useMemo(() => {
-        if (!selectedRouteId) return [];
+        if (!selectedRouteId) return[];
         return risks.filter(risk => risk.associatedRouteIds.includes(selectedRouteId));
     }, [selectedRouteId, risks]);
     
