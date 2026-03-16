@@ -1,16 +1,24 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+--- START OF FILE App.tsx ---
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, Tooltip } from 'react-leaflet';
 import L, { LatLngExpression, LatLng, Icon } from 'leaflet';
 import { pointToLineDistance } from '@turf/turf';
 import { kml } from '@tmcw/togeojson';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { Route, Risk, RiskType, Position, GeoJSONFeature, GeoJSONLineString } from './types';
+import type { Route, Risk, RiskType, Position, GeoJSONFeature, GeoJSONLineString, RouteGeoJSON } from './types';
 import { Panel } from './components/Panel';
 import { RiskModal } from './components/RiskModal';
 import { MapClickHandler } from './components/MapClickHandler';
 import { PublicRouteViewer } from './components/PublicRouteViewer';
 import { Edit2, Trash2, Folder, Video, AlertCircle } from 'lucide-react';
+
+// Importamos la conexión a la Base de Datos Nube (Firebase)
+import { 
+    saveRouteToDB, loadRoutesFromDB, deleteRouteFromDB,
+    saveRiskToDB, loadRisksFromDB, deleteRiskFromDB,
+    saveRiskTypeToDB, loadRiskTypesFromDB, deleteRiskTypeFromDB
+} from './lib/firebase';
 
 export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'settings';
 
@@ -18,12 +26,24 @@ const SAN_RAFAEL_CENTER: LatLngExpression =[-34.6175, -68.335];
 
 const createRiskIcon = (color: string) => {
     const iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="32" height="32"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
-    return new Icon({
-        iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`,
-        iconSize:[32, 32],
-        iconAnchor:[16, 32],
-        popupAnchor:[0, -32]
-    });
+    return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
+};
+
+// --- FUNCIÓN UTILITARIA PARA CALCULAR CERCANÍA ---
+// Extraída para poder usarse tanto al crear riesgos como al crear rutas
+const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThreshold: number): boolean => {
+    if (!geoJson || !geoJson.features) return false;
+    const riskPoint =[position.lng, position.lat];
+    const features = geoJson.features.filter(
+        (feature): feature is GeoJSONFeature<GeoJSONLineString> => feature.geometry.type === 'LineString'
+    );
+    for (const feature of features) {
+        const distance = pointToLineDistance(riskPoint, feature.geometry.coordinates, { units: 'meters' });
+        if (distance <= distanceThreshold) {
+            return true;
+        }
+    }
+    return false;
 };
 
 const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes, risks }) => {
@@ -47,57 +67,136 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
         } else {
             map.setView(SAN_RAFAEL_CENTER, 13);
         }
-    },[routes, risks, map]);
+    }, [routes, risks, map]);
     return null;
 };
 
 const App: React.FC = () => {
-    const[activeTab, setActiveTab] = useState<AppTab>('routes');
-    
-    // Toggles Globales
-    const[showRisks, setShowRisks] = useState(true);
-    const[showIncidents, setShowIncidents] = useState(true);
+    const[isLoadingData, setIsLoadingData] = useState(true);
+    const [activeTab, setActiveTab] = useState<AppTab>('routes');
+   
+    const [showRisks, setShowRisks] = useState(true);
+    const [showIncidents, setShowIncidents] = useState(true);
 
-    const [filterGroup, setFilterGroup] = useState('');
+    const[filterGroup, setFilterGroup] = useState('');
     const [filterLine, setFilterLine] = useState('');
     const[filterService, setFilterService] = useState('');
-    const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
-    const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
+    const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
+    const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const[riskTypes, setRiskTypes] = useState<RiskType[]>(() => {
-        const saved = localStorage.getItem('riskTypes');
-        return saved ? JSON.parse(saved) :[
-            { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false },
-            { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false },
-            { id: '3', name: 'Cruce Peligroso', color: '#f97316', isIncident: false },
-            { id: '4', name: 'Contingencia Climática', color: '#8b5cf6', isIncident: false },
-            { id: '5', name: 'Accidente Histórico', color: '#eab308', isIncident: true },
-        ];
-    });
-    
-    const[routes, setRoutes] = useState<Route[]>(() => JSON.parse(localStorage.getItem('routes') || '[]'));
-    const[risks, setRisks] = useState<Risk[]>(() => JSON.parse(localStorage.getItem('risks') || '[]'));
+    const [riskTypes, setRiskTypes] = useState<RiskType[]>([]);
+    const [routes, setRoutes] = useState<Route[]>([]);
+    const[risks, setRisks] = useState<Risk[]>([]);
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
-    // --- INTERCEPTOR DE URL PÚBLICA ---
+    // Refs para la sincronización Mágica
+    const prevRoutesRef = useRef<Route[]>([]);
+    const prevRisksRef = useRef<Risk[]>([]);
+    const prevRiskTypesRef = useRef<RiskType[]>([]);
+
     const urlParams = new URLSearchParams(window.location.search);
     const publicRouteId = urlParams.get('publicRoute');
 
+    // Carga inicial (Intenta Firebase, si falla usa LocalStorage)
+    useEffect(() => {
+        const initData = async () => {
+            setIsLoadingData(true);
+            try {
+                const dbRoutes = await loadRoutesFromDB();
+                const dbRisks = await loadRisksFromDB();
+                const dbRiskTypes = await loadRiskTypesFromDB();
+
+                setRoutes(dbRoutes); prevRoutesRef.current = dbRoutes;
+                setRisks(dbRisks); prevRisksRef.current = dbRisks;
+
+                if (dbRiskTypes.length > 0) {
+                    setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes;
+                } else {
+                    const defaultTypes: RiskType[] =[
+                        { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false },
+                        { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false },
+                        { id: '3', name: 'Cruce Peligroso', color: '#f97316', isIncident: false },
+                        { id: '4', name: 'Contingencia Climática', color: '#8b5cf6', isIncident: false },
+                        { id: '5', name: 'Accidente Histórico', color: '#eab308', isIncident: true },
+                    ];
+                    setRiskTypes(defaultTypes);
+                    defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{}));
+                    prevRiskTypesRef.current = defaultTypes;
+                }
+            } catch (err) {
+                console.warn("Base de datos Nube no conectada. Usando Modo Local.", err);
+                const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]');
+                const localRisks = JSON.parse(localStorage.getItem('risks') || '[]');
+                const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]');
+                
+                setRoutes(localRoutes); prevRoutesRef.current = localRoutes;
+                setRisks(localRisks); prevRisksRef.current = localRisks;
+                if(localTypes.length > 0) { setRiskTypes(localTypes); prevRiskTypesRef.current = localTypes; }
+            } finally {
+                setIsLoadingData(false);
+            }
+        };
+        initData();
+    },[]);
+
+    // Sincronización en tiempo real (Guarda en Nube y LocalStorage automáticamente)
+    useEffect(() => {
+        if (isLoadingData) return;
+        localStorage.setItem('routes', JSON.stringify(routes));
+        const prev = prevRoutesRef.current;
+        const deleted = prev.filter(p => !routes.find(c => c.id === p.id));
+        const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
+        
+        deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
+        added.forEach(c => saveRouteToDB(c).catch(()=>{}));
+        prevRoutesRef.current = routes;
+    }, [routes, isLoadingData]);
+
+    useEffect(() => {
+        if (isLoadingData) return;
+        localStorage.setItem('risks', JSON.stringify(risks));
+        const prev = prevRisksRef.current;
+        const deleted = prev.filter(p => !risks.find(c => c.id === p.id));
+        const added = risks.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
+        
+        deleted.forEach(d => deleteRiskFromDB(d.id).catch(()=>{}));
+        added.forEach(c => saveRiskToDB(c).catch(()=>{}));
+        prevRisksRef.current = risks;
+    },[risks, isLoadingData]);
+
+    useEffect(() => {
+        if (isLoadingData) return;
+        localStorage.setItem('riskTypes', JSON.stringify(riskTypes));
+        const prev = prevRiskTypesRef.current;
+        const deleted = prev.filter(p => !riskTypes.find(c => c.id === p.id));
+        const added = riskTypes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
+        
+        deleted.forEach(d => deleteRiskTypeFromDB(d.id).catch(()=>{}));
+        added.forEach(c => saveRiskTypeToDB(c).catch(()=>{}));
+        prevRiskTypesRef.current = riskTypes;
+    }, [riskTypes, isLoadingData]);
+
+    useEffect(() => { localStorage.setItem('proximityDistance', proximityDistance.toString()); }, [proximityDistance]);
+    
     useEffect(() => {
         setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null);
     }, [activeTab]);
 
-    useEffect(() => { localStorage.setItem('riskTypes', JSON.stringify(riskTypes)); }, [riskTypes]);
-    useEffect(() => { localStorage.setItem('routes', JSON.stringify(routes)); }, [routes]);
-    useEffect(() => { localStorage.setItem('risks', JSON.stringify(risks)); }, [risks]);
-    useEffect(() => { localStorage.setItem('proximityDistance', proximityDistance.toString()); }, [proximityDistance]);
-    
-    // Si hay un ID en la URL, mostrar el Visor Público
+    // Visor Público (Se evalúa después de cargar los datos)
     if (publicRouteId) {
+        if (isLoadingData) {
+            return (
+                <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div>
+                    <h1 className="text-xl font-bold text-sky-400">Cargando recorrido público...</h1>
+                </div>
+            );
+        }
+
         const publicRoute = routes.find(r => r.id === publicRouteId);
         if (publicRoute && publicRoute.isPublic) {
             const associatedRisks = risks.filter(risk => risk.associatedRouteIds.includes(publicRouteId));
@@ -119,24 +218,14 @@ const App: React.FC = () => {
 
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
         const associatedIds: string[] =[];
-        const riskPoint =[position.lng, position.lat];
         routes.forEach(route => {
-            if (route.geoJson) {
-                const features = route.geoJson.features.filter(
-                    (feature): feature is GeoJSONFeature<GeoJSONLineString> => feature.geometry.type === 'LineString'
-                );
-                for (const feature of features) {
-                    const distance = pointToLineDistance(riskPoint, feature.geometry.coordinates, { units: 'meters' });
-                    if (distance <= proximityDistance) {
-                        associatedIds.push(route.id);
-                        break;
-                    }
-                }
+            if (route.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) {
+                associatedIds.push(route.id);
             }
         });
         return associatedIds;
     }, [routes, proximityDistance]);
-    
+   
     const handleMapClick = (latlng: LatLng) => {
         if (activeTab === 'riskTypes') {
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
@@ -146,8 +235,8 @@ const App: React.FC = () => {
 
     const handleSaveRisk = (id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
-            setRisks(prev => prev.map(r => r.id === id ? { 
-                ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(r.position) 
+            setRisks(prev => prev.map(r => r.id === id ? {
+                ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(r.position)
             } : r));
             setEditingRisk(null);
         } else if (newRiskPosition) {
@@ -163,28 +252,39 @@ const App: React.FC = () => {
     const handleDeleteRisk = (id: string) => {
         if (window.confirm("¿Está seguro que desea eliminar este punto?")) setRisks(prev => prev.filter(r => r.id !== id));
     };
-    
+   
     const handleAddRoute = (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const kmlContent = event.target?.result as string;
                 const dom = new DOMParser().parseFromString(kmlContent, 'application/xml');
-                const geoJson = kml(dom);
+                const geoJson = kml(dom) as any;
                 const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
-                setRoutes(prev =>[...prev, newRoute]);
                 
-                setRisks(prevRisks => prevRisks.map(risk => ({
-                    ...risk,
-                    associatedRouteIds: [...new Set([...risk.associatedRouteIds, ...findAssociatedRouteIds(risk.position)])]
-                })));
+                // 1. Guardar la nueva ruta
+                setRoutes(prev => [...prev, newRoute]);
+               
+                // 2. MAGIA: Actualizar riesgos existentes escaneando la nueva ruta
+                setRisks(prevRisks => prevRisks.map(risk => {
+                    // Si el riesgo viejo está cerca de la ruta nueva...
+                    if (isPointNearRoute(risk.position, geoJson, proximityDistance)) {
+                        return {
+                            ...risk,
+                            // ... le agregamos el ID de la ruta nueva a su lista de afectados
+                            associatedRouteIds: [...new Set([...risk.associatedRouteIds, newRoute.id])]
+                        };
+                    }
+                    return risk;
+                }));
+
             } catch (error) {
                 alert("Error al procesar el archivo KML. Por favor, asegúrese de que sea un archivo válido.");
             }
         };
         reader.readAsText(kmlFile);
     };
-    
+   
     const getRiskType = (id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id);
 
     const baseVisibleRisks = useMemo(() => {
@@ -195,7 +295,7 @@ const App: React.FC = () => {
             if (!rt.isIncident && !showRisks) return false;
             return true;
         });
-    }, [risks, riskTypes, showRisks, showIncidents]);
+    },[risks, riskTypes, showRisks, showIncidents]);
 
     const visibleRoutes = useMemo(() => {
         if (activeTab === 'routes') {
@@ -229,8 +329,17 @@ const App: React.FC = () => {
             if (riskViewerSelectedTypes.length === 0) return[];
             return baseVisibleRisks.filter(risk => riskViewerSelectedTypes.includes(risk.riskTypeId));
         }
-        return baseVisibleRisks; 
+        return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
+
+    if (isLoadingData) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div>
+                <h1 className="text-xl font-bold text-sky-400">Conectando con la Base de Datos...</h1>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen w-screen bg-gray-100 font-sans">
@@ -249,7 +358,7 @@ const App: React.FC = () => {
                 activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId}
                 reportSelectedRouteId={reportSelectedRouteId} setReportSelectedRouteId={setReportSelectedRouteId}
                 riskViewerSelectedTypes={riskViewerSelectedTypes} setRiskViewerSelectedTypes={setRiskViewerSelectedTypes}
-                togglePublicRoute={togglePublicRoute} // NUEVA PROP
+                togglePublicRoute={togglePublicRoute}
             />
             <main className="flex-1 h-full relative">
                  <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
@@ -261,7 +370,7 @@ const App: React.FC = () => {
                         const path: LatLngExpression[][] =[];
                         if (route.geoJson) {
                             route.geoJson.features.forEach(feature => {
-                                if (feature.geometry.type === 'LineString') path.push(feature.geometry.coordinates.map(([lng, lat]) => [lat, lng]));
+                                if (feature.geometry.type === 'LineString') path.push(feature.geometry.coordinates.map(([lng, lat]) =>[lat, lng]));
                             });
                         }
                         const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer') ? 1 : 0.4;
@@ -273,7 +382,7 @@ const App: React.FC = () => {
                         if (!riskType) return null;
                         const icon = createRiskIcon(riskType.color);
                         const associatedRoutes = routes.filter(r => risk.associatedRouteIds.includes(r.id));
-                        
+                       
                         return (
                              <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
                                 {activeTab === 'routes' && (
@@ -295,7 +404,7 @@ const App: React.FC = () => {
                                         )}
                                     </div>
                                     <p className="text-gray-700 text-sm mb-2">{risk.description}</p>
-                                    
+                                   
                                     <div className="flex gap-2 items-center mb-2">
                                         {risk.images && risk.images.length > 0 && risk.images.map((img, idx) => img && (
                                             <a key={idx} href={img} target="_blank" rel="noreferrer" title="Ver imagen">
@@ -325,10 +434,6 @@ const App: React.FC = () => {
                     {newRiskPosition && activeTab === 'riskTypes' && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
                 </MapContainer>
             </main>
-            
+           
             {isAddRiskModalOpen && newRiskPosition && <RiskModal riskTypes={riskTypes} onClose={() => setIsAddRiskModalOpen(false)} onSave={(...args) => handleSaveRisk(uuidv4(), ...args, false)} />}
-            {editingRisk && <RiskModal riskTypes={riskTypes} editingRisk={editingRisk} onClose={() => setEditingRisk(null)} onSave={(...args) => handleSaveRisk(editingRisk.id, ...args, true)} />}
-        </div>
-    );
-};
-export default App;
+            {editingRisk && <RiskModal riskTypes={riskTypes} editingRisk={editingRisk} onClose={() => setEditingRisk(null)} onSave={(...args) => handleS
