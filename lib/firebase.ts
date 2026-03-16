@@ -5,11 +5,11 @@ import type { Route, Risk, RiskType } from '../types';
 
 // 👇 REEMPLAZA ESTO CON LO QUE TE DIO FIREBASE 👇
 const firebaseConfig = {
-  apiKey: "AIzaSyBiSZHiOG4NPh7nC298DG48t2ARPbR0kWs",
-  authDomain: "riesgo-vial.firebaseapp.com",
-  projectId: "riesgo-vial",
-  storageBucket: "riesgo-vial.firebasestorage.app",
-  messagingSenderId: "204923217648",
+  apiKey: "AIzaSyBiSZHiOG4NPh7nC298DG48t2ARPbR0kWs";
+  authDomain: "riesgo-vial.firebaseapp.com";
+  projectId: "riesgo-vial";
+  storageBucket: "riesgo-vial.firebasestorage.app";
+  messagingSenderId: "204923217648";
   appId: "1:204923217648:web:5b655f6469f5ad306e0435"
 };
 // 👆 ------------------------------------------- 👆
