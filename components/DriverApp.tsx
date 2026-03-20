@@ -1,4 +1,3 @@
---- START OF FILE components/DriverApp.tsx ---
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { MapPin, AlertTriangle, CheckCircle, Navigation, AlertOctagon, Construction, Zap, Info } from 'lucide-react';
