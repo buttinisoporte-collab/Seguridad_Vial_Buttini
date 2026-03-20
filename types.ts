@@ -10,15 +10,29 @@ export interface RiskType {
     isIncident: boolean;
 }
 
+// NUEVO: Estructura IRAM 3810
+export interface DriverReportDetails {
+    unidad: string;
+    linea: string;
+    sentido: string; // 'Ascendente' | 'Descendente' | 'Ambos'
+    categoriaIRAM: string;
+    huboDesvio: boolean;
+    rutaAlternativa?: string;
+    velocidadSugerida?: string;
+    carrilRecomendado?: string;
+    ubicacionManual?: string; // Por si falla el GPS
+}
+
 export interface Risk {
     id: string;
     position: Position;
-    riskTypeId: string;
+    riskTypeId: string; // Se mapeará al tipo más cercano en tu DB
     description: string;
     associatedRouteIds: string[];
     images: string[];
     videoUrl?: string;
     driveUrl?: string;
+    driverReportDetails?: DriverReportDetails; // NUEVO
 }
 
 export interface GeoJSONFeature<T> {
@@ -29,7 +43,7 @@ export interface GeoJSONFeature<T> {
 
 export interface GeoJSONLineString {
     type: "LineString";
-    coordinates: [number, number][]; //[lng, lat]
+    coordinates: [number, number][];
 }
 
 export interface GeoJSONGeometryCollection {
@@ -51,5 +65,5 @@ export interface Route {
     line: string;
     service: string;
     geoJson: RouteGeoJSON;
-    isPublic?: boolean; // NUEVO: Determina si el recorrido tiene link público habilitado
+    isPublic?: boolean;
 }

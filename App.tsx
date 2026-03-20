@@ -10,7 +10,8 @@ import { Panel } from './components/Panel';
 import { RiskModal } from './components/RiskModal';
 import { MapClickHandler } from './components/MapClickHandler';
 import { PublicRouteViewer } from './components/PublicRouteViewer';
-import { Edit2, Trash2, Folder, Video, AlertCircle } from 'lucide-react';
+import { DriverApp } from './components/DriverApp'; // NUEVO COMPONENTE
+import { Edit2, Trash2, Folder, Video, AlertCircle, Bus, ShieldAlert, Navigation } from 'lucide-react';
 
 // Importamos la conexión a la Base de Datos Nube (Firebase)
 import { 
@@ -28,8 +29,6 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
-// --- FUNCIÓN UTILITARIA PARA CALCULAR CERCANÍA ---
-// Extraída para poder usarse tanto al crear riesgos como al crear rutas
 const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThreshold: number): boolean => {
     if (!geoJson || !geoJson.features) return false;
     const riskPoint =[position.lng, position.lat];
@@ -66,7 +65,7 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
         } else {
             map.setView(SAN_RAFAEL_CENTER, 13);
         }
-    }, [routes, risks, map]);
+    },[routes, risks, map]);
     return null;
 };
 
@@ -90,17 +89,16 @@ const App: React.FC = () => {
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
-    // Refs para la sincronización Mágica
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
     const prevRiskTypesRef = useRef<RiskType[]>([]);
 
     const urlParams = new URLSearchParams(window.location.search);
     const publicRouteId = urlParams.get('publicRoute');
+    const isDriverMode = urlParams.get('mode') === 'driver'; // NUEVO MODO
 
-    // Carga inicial (Intenta Firebase, si falla usa LocalStorage)
     useEffect(() => {
         const initData = async () => {
             setIsLoadingData(true);
@@ -142,14 +140,13 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronización en tiempo real (Guarda en Nube y LocalStorage automáticamente)
+    // Sincronización en tiempo real
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
         const prev = prevRoutesRef.current;
         const deleted = prev.filter(p => !routes.find(c => c.id === p.id));
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        
         deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveRouteToDB(c).catch(()=>{}));
         prevRoutesRef.current = routes;
@@ -161,7 +158,6 @@ const App: React.FC = () => {
         const prev = prevRisksRef.current;
         const deleted = prev.filter(p => !risks.find(c => c.id === p.id));
         const added = risks.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        
         deleted.forEach(d => deleteRiskFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveRiskToDB(c).catch(()=>{}));
         prevRisksRef.current = risks;
@@ -173,7 +169,6 @@ const App: React.FC = () => {
         const prev = prevRiskTypesRef.current;
         const deleted = prev.filter(p => !riskTypes.find(c => c.id === p.id));
         const added = riskTypes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        
         deleted.forEach(d => deleteRiskTypeFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveRiskTypeToDB(c).catch(()=>{}));
         prevRiskTypesRef.current = riskTypes;
@@ -183,9 +178,38 @@ const App: React.FC = () => {
     
     useEffect(() => {
         setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null);
-    }, [activeTab]);
+    },[activeTab]);
 
-    // Visor Público (Se evalúa después de cargar los datos)
+    // --- CÁLCULO DE ASOCIACIONES GLOBALES ---
+    const findAssociatedRouteIds = useCallback((position: Position): string[] => {
+        const associatedIds: string[] =[];
+        routes.forEach(route => {
+            if (route.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) {
+                associatedIds.push(route.id);
+            }
+        });
+        return associatedIds;
+    }, [routes, proximityDistance]);
+
+
+    // ==========================================
+    // RENDER MODO CONDUCTOR (IRAM 3810)
+    // ==========================================
+    if (isDriverMode) {
+        if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
+        
+        const handleDriverSave = (newRisk: Risk) => {
+            // Recalculamos asociaciones al momento de guardar (por si el GPS encontró rutas)
+            const riskWithRoutes = { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) };
+            setRisks(prev => [...prev, riskWithRoutes]);
+        };
+        
+        return <DriverApp riskTypes={riskTypes} onSaveReport={handleDriverSave} />;
+    }
+
+    // ==========================================
+    // RENDER VISOR PÚBLICO
+    // ==========================================
     if (publicRouteId) {
         if (isLoadingData) {
             return (
@@ -215,16 +239,6 @@ const App: React.FC = () => {
         setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r));
     };
 
-    const findAssociatedRouteIds = useCallback((position: Position): string[] => {
-        const associatedIds: string[] =[];
-        routes.forEach(route => {
-            if (route.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) {
-                associatedIds.push(route.id);
-            }
-        });
-        return associatedIds;
-    }, [routes, proximityDistance]);
-   
     const handleMapClick = (latlng: LatLng) => {
         if (activeTab === 'riskTypes') {
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
@@ -261,22 +275,14 @@ const App: React.FC = () => {
                 const geoJson = kml(dom) as any;
                 const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
                 
-                // 1. Guardar la nueva ruta
                 setRoutes(prev => [...prev, newRoute]);
                
-                // 2. MAGIA: Actualizar riesgos existentes escaneando la nueva ruta
                 setRisks(prevRisks => prevRisks.map(risk => {
-                    // Si el riesgo viejo está cerca de la ruta nueva...
                     if (isPointNearRoute(risk.position, geoJson, proximityDistance)) {
-                        return {
-                            ...risk,
-                            // ... le agregamos el ID de la ruta nueva a su lista de afectados
-                            associatedRouteIds: [...new Set([...risk.associatedRouteIds, newRoute.id])]
-                        };
+                        return { ...risk, associatedRouteIds: [...new Set([...risk.associatedRouteIds, newRoute.id])] };
                     }
                     return risk;
                 }));
-
             } catch (error) {
                 alert("Error al procesar el archivo KML. Por favor, asegúrese de que sea un archivo válido.");
             }
@@ -390,19 +396,49 @@ const App: React.FC = () => {
                                     </Tooltip>
                                 )}
                                 <Popup>
-                                    <div className="flex justify-between items-start mb-1 min-w-[200px]">
+                                    <div className="flex justify-between items-start mb-1 min-w-[250px]">
                                         <div>
-                                            <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{riskType.name}</div>
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">{riskType.isIncident ? 'Siniestro' : 'Riesgo Vial'}</div>
+                                            <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>
+                                                {risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                                                {risk.driverReportDetails ? 'Reporte Conductor (IRAM 3810)' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}
+                                            </div>
                                         </div>
                                         {activeTab === 'riskTypes' && (
                                             <div className="flex gap-1 ml-2">
-                                                <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500" title="Editar"><Edit2 size={14} /></button>
+                                                {!risk.driverReportDetails && <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500" title="Editar"><Edit2 size={14} /></button>}
                                                 <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500" title="Eliminar"><Trash2 size={14} /></button>
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-gray-700 text-sm mb-2">{risk.description}</p>
+                                    
+                                    {/* RENDERIZADO ESPECIAL IRAM 3810 */}
+                                    {risk.driverReportDetails ? (
+                                        <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
+                                            <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
+                                                <div className="flex items-center gap-1 text-gray-700"><Bus size={12}/> <b>Línea:</b> {risk.driverReportDetails.linea}</div>
+                                                <div className="flex items-center gap-1 text-gray-700"><b>U.:</b> {risk.driverReportDetails.unidad}</div>
+                                                <div className="flex items-center gap-1 text-gray-700 col-span-2"><Navigation size={12}/> <b>Sentido:</b> {risk.driverReportDetails.sentido}</div>
+                                            </div>
+                                            
+                                            <div className="text-xs space-y-1 mb-2">
+                                                {risk.driverReportDetails.ubicacionManual && <p><b>Ubicación Manual:</b> {risk.driverReportDetails.ubicacionManual}</p>}
+                                                <p className="flex items-center gap-1 text-red-600 font-bold"><ShieldAlert size={12}/> {risk.driverReportDetails.huboDesvio ? 'Desvío Activado' : 'Sin Desvío'}</p>
+                                                {risk.driverReportDetails.rutaAlternativa && <p className="text-gray-600 ml-4">Ruta: {risk.driverReportDetails.rutaAlternativa}</p>}
+                                                {risk.driverReportDetails.velocidadSugerida && <p className="text-yellow-600 font-medium">Velocidad Precautoria: {risk.driverReportDetails.velocidadSugerida} km/h</p>}
+                                                {risk.driverReportDetails.carrilRecomendado && <p className="text-sky-600 font-medium">Carril: {risk.driverReportDetails.carrilRecomendado}</p>}
+                                            </div>
+                                            
+                                            {risk.description && (
+                                                <div className="bg-white p-2 rounded text-xs text-gray-700 italic border border-gray-200">
+                                                    "{risk.description}"
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-700 text-sm mb-2">{risk.description}</p>
+                                    )}
                                    
                                     <div className="flex gap-2 items-center mb-2">
                                         {risk.images && risk.images.length > 0 && risk.images.map((img, idx) => img && (
