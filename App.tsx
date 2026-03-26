@@ -11,15 +11,15 @@ import { RiskModal } from './components/RiskModal';
 import { MapClickHandler } from './components/MapClickHandler';
 import { PublicRouteViewer } from './components/PublicRouteViewer';
 import { DriverApp } from './components/DriverApp';
-import { Login } from './components/Login'; // NUEVO COMPONENTE
+import { Login } from './components/Login';
 import { Edit2, Trash2, Folder, Video, AlertCircle, Bus, ShieldAlert, Navigation } from 'lucide-react';
 
 import { 
     saveRouteToDB, loadRoutesFromDB, deleteRouteFromDB,
     saveRiskToDB, loadRisksFromDB, deleteRiskFromDB,
     saveRiskTypeToDB, loadRiskTypesFromDB, deleteRiskTypeFromDB,
-    saveUserToDB, loadUsersFromDB, deleteUserFromDB // NUEVOS MÉTODOS
-} from './lib/firebase';
+    saveUserToDB, loadUsersFromDB, deleteUserFromDB
+} from './src/lib/firebase';
 
 const SAN_RAFAEL_CENTER: LatLngExpression =[-34.6175, -68.335];
 
@@ -33,7 +33,7 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     const riskPoint =[position.lng, position.lat];
     const features = geoJson.features.filter((feature): feature is GeoJSONFeature<GeoJSONLineString> => feature.geometry.type === 'LineString');
     for (const feature of features) {
-        if (pointToLineDistance(riskPoint, feature.geometry as any, { units: 'meters' }) <= distanceThreshold) return true;
+        if (pointToLineDistance(riskPoint, feature.geometry.coordinates, { units: 'meters' }) <= distanceThreshold) return true;
     }
     return false;
 };
@@ -55,9 +55,11 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 };
 
 const App: React.FC = () => {
-    const[isLoadingData, setIsLoadingData] = useState(true);
+    // ==========================================
+    // 1. ESTADOS Y HOOKS (Todos al inicio)
+    // ==========================================
+    const [isLoadingData, setIsLoadingData] = useState(true);
     
-    // --- ESTADO DE AUTENTICACIÓN ---
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
         const saved = localStorage.getItem('currentUser');
         return saved ? JSON.parse(saved) : null;
@@ -65,22 +67,22 @@ const App: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState<AppTab>('routes');
     const [showRisks, setShowRisks] = useState(true);
-    const[showIncidents, setShowIncidents] = useState(true);
-    const [filterGroup, setFilterGroup] = useState('');
+    const [showIncidents, setShowIncidents] = useState(true);
+    const[filterGroup, setFilterGroup] = useState('');
     const [filterLine, setFilterLine] = useState('');
-    const[filterService, setFilterService] = useState('');
+    const [filterService, setFilterService] = useState('');
     const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const [users, setUsers] = useState<User[]>([]); // Estado de Usuarios DB
+    const [users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [risks, setRisks] = useState<Risk[]>([]);
-    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const [isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
+    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
@@ -95,7 +97,7 @@ const App: React.FC = () => {
         const initData = async () => {
             setIsLoadingData(true);
             try {
-                const [dbRoutes, dbRisks, dbRiskTypes, dbUsers] = await Promise.all([
+                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers] = await Promise.all([
                     loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB()
                 ]);
 
@@ -114,7 +116,6 @@ const App: React.FC = () => {
                     setRiskTypes(defaultTypes); defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{})); prevRiskTypesRef.current = defaultTypes;
                 }
 
-                // Carga de usuarios y creación de Admin por defecto si no hay ninguno
                 if (dbUsers.length > 0) { setUsers(dbUsers); prevUsersRef.current = dbUsers; } 
                 else {
                     const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings'] };
@@ -128,7 +129,7 @@ const App: React.FC = () => {
                 const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
                 if(localUsers.length > 0) setUsers(localUsers);
                 else {
-                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Local', username: 'admin', pin: '1234', isAdmin: true, allowedTabs: ['routes', 'riskTypes', 'reports', 'riskViewer', 'settings'] };
+                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Local', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings'] };
                     setUsers([defaultAdmin]);
                 }
             } finally {
@@ -182,18 +183,17 @@ const App: React.FC = () => {
         added.forEach(c => saveUserToDB(c).catch(()=>{}));
         prevUsersRef.current = users;
         
-        // Si editaron al usuario logueado, actualizamos su sesión actual
         if (currentUser) {
             const updatedMe = users.find(u => u.id === currentUser.id);
             if (updatedMe && JSON.stringify(updatedMe) !== JSON.stringify(currentUser)) {
                 setCurrentUser(updatedMe);
                 localStorage.setItem('currentUser', JSON.stringify(updatedMe));
             } else if (!updatedMe) {
-                // Me eliminaron
-                handleLogout();
+                setCurrentUser(null);
+                localStorage.removeItem('currentUser');
             }
         }
-    },[users, isLoadingData]);
+    },[users, isLoadingData, currentUser]);
 
     useEffect(() => { localStorage.setItem('proximityDistance', proximityDistance.toString()); },[proximityDistance]);
     
@@ -201,18 +201,17 @@ const App: React.FC = () => {
         setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null);
     },[activeTab]);
 
-    const handleLogin = (user: User) => {
+    const handleLogin = useCallback((user: User) => {
         setCurrentUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
-        // Reset a una pestaña que tenga permitida
         if (user.isAdmin) setActiveTab('routes');
         else if (user.allowedTabs.length > 0) setActiveTab(user.allowedTabs[0]);
-    };
+    },[]);
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         setCurrentUser(null);
         localStorage.removeItem('currentUser');
-    };
+    }, []);
 
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
         const associatedIds: string[] =[];
@@ -222,79 +221,41 @@ const App: React.FC = () => {
         return associatedIds;
     }, [routes, proximityDistance]);
 
-
-    // ==========================================
-    // RENDER: VISOR PÚBLICO O MODO CONDUCTOR (Sin Login)
-    // ==========================================
-    if (isDriverMode) {
-        if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
-        return <DriverApp riskTypes={riskTypes} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
-    }
-
-    if (publicRouteId) {
-        if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
-        const publicRoute = routes.find(r => r.id === publicRouteId);
-        if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={risks.filter(risk => risk.associatedRouteIds.includes(publicRouteId))} riskTypes={riskTypes} />;
-        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
-    }
-
-    // ==========================================
-    // RENDER: PANTALLA DE LOGIN
-    // ==========================================
-    if (!currentUser && !isLoadingData) {
-        return <Login users={users} onLogin={handleLogin} />;
-    }
-
-    if (isLoadingData) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div>
-                <h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1>
-            </div>
-        );
-    }
-
-    // ==========================================
-    // RENDER: APLICACIÓN PRINCIPAL LOGUEADA
-    // ==========================================
-    const togglePublicRoute = (id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r));
-    const handleMapClick = (latlng: LatLng) => {
+    const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
+    
+    const handleMapClick = useCallback((latlng: LatLng) => {
         if (activeTab === 'riskTypes' && currentUser?.allowedTabs.includes('riskTypes')) {
-            const pos = { lat: latlng.lat, lng: latlng.lng };
-            setNewRiskPosition(pos);
-            // Pre-calcular rutas asociadas por defecto
-            // No podemos usar findAssociatedRouteIds aquí directamente si queremos pasar los IDs al modal
-            // Pero el modal ya los recibirá si los calculamos antes de abrirlo
+            setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
             setIsAddRiskModalOpen(true);
         }
-    };
+    }, [activeTab, currentUser]);
 
-    const handleSaveRisk = (id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, associatedRouteIds: string[], isEditing: boolean) => {
+    const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
-            setRisks(prev => prev.map(r => r.id === id ? { ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds } : r));
+            setRisks(prev => prev.map(r => r.id === id ? { ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(r.position) } : r));
             setEditingRisk(null);
         } else if (newRiskPosition) {
-            setRisks(prev =>[...prev, { id, position: newRiskPosition, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds }]);
+            setRisks(prev =>[...prev, { id, position: newRiskPosition, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(newRiskPosition) }]);
             setIsAddRiskModalOpen(false); setNewRiskPosition(null);
         }
-    };
+    },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
 
-    const handleDeleteRisk = (id: string) => { if (window.confirm("¿Eliminar este punto?")) setRisks(prev => prev.filter(r => r.id !== id)); };
+    const handleDeleteRisk = useCallback((id: string) => { if (window.confirm("¿Eliminar este punto?")) setRisks(prev => prev.filter(r => r.id !== id)); },[]);
    
-    const handleAddRoute = (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
+    const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const geoJson = kml(new DOMParser().parseFromString(event.target?.result as string, 'application/xml')) as any;
                 const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
-                setRoutes(prev => [...prev, newRoute]);
-                setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, geoJson, proximityDistance) ? { ...risk, associatedRouteIds: [...new Set([...risk.associatedRouteIds, newRoute.id])] } : risk));
+                setRoutes(prev =>[...prev, newRoute]);
+                setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, geoJson, proximityDistance) ? { ...risk, associatedRouteIds:[...new Set([...risk.associatedRouteIds, newRoute.id])] } : risk));
             } catch (error) { alert("Error al procesar el archivo KML."); }
         };
         reader.readAsText(kmlFile);
-    };
+    }, [proximityDistance]);
    
-    const getRiskType = (id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id);
+    const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id), [riskTypes]);
 
     const baseVisibleRisks = useMemo(() => risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
@@ -302,7 +263,7 @@ const App: React.FC = () => {
         if (rt.isIncident && !showIncidents) return false;
         if (!rt.isIncident && !showRisks) return false;
         return true;
-    }),[risks, riskTypes, showRisks, showIncidents]);
+    }),[risks, getRiskType, showRisks, showIncidents]);
 
     const visibleRoutes = useMemo(() => {
         if (activeTab === 'routes') return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || route.group.toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || route.line.toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || route.service.toLowerCase().includes(filterService.toLowerCase())));
@@ -322,6 +283,38 @@ const App: React.FC = () => {
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
+    // ==========================================
+    // 2. RENDERIZADOS CONDICIONALES (Después de los hooks)
+    // ==========================================
+
+    if (isDriverMode) {
+        if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
+        return <DriverApp riskTypes={riskTypes} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
+    }
+
+    if (publicRouteId) {
+        if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
+        const publicRoute = routes.find(r => r.id === publicRouteId);
+        if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={risks.filter(risk => risk.associatedRouteIds.includes(publicRouteId))} riskTypes={riskTypes} />;
+        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
+    }
+
+    if (!currentUser && !isLoadingData) {
+        return <Login users={users} onLogin={handleLogin} />;
+    }
+
+    if (isLoadingData) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div>
+                <h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1>
+            </div>
+        );
+    }
+
+    // ==========================================
+    // 3. RENDERIZADO PRINCIPAL (Logueado)
+    // ==========================================
     return (
         <div className="flex h-screen w-screen bg-gray-100 font-sans">
             <Panel
@@ -369,7 +362,6 @@ const App: React.FC = () => {
                                         )}
                                     </div>
                                     
-                                    {/* Mismo renderizado de detalles que ya tenías */}
                                     {risk.driverReportDetails ? (
                                         <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
                                             <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
@@ -408,28 +400,8 @@ const App: React.FC = () => {
                 </MapContainer>
             </main>
            
-            {isAddRiskModalOpen && newRiskPosition && (
-                <RiskModal 
-                    riskTypes={riskTypes} 
-                    routes={routes}
-                    initialAssociatedRouteIds={findAssociatedRouteIds(newRiskPosition)}
-                    onClose={() => setIsAddRiskModalOpen(false)} 
-                    onSave={(riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds) => 
-                        handleSaveRisk(uuidv4(), riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds, false)
-                    } 
-                />
-            )}
-            {editingRisk && (
-                <RiskModal 
-                    riskTypes={riskTypes} 
-                    routes={routes}
-                    editingRisk={editingRisk} 
-                    onClose={() => setEditingRisk(null)} 
-                    onSave={(riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds) => 
-                        handleSaveRisk(editingRisk.id, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds, true)
-                    } 
-                />
-            )}
+            {isAddRiskModalOpen && newRiskPosition && <RiskModal riskTypes={riskTypes} onClose={() => setIsAddRiskModalOpen(false)} onSave={(...args) => handleSaveRisk(uuidv4(), ...args, false)} />}
+            {editingRisk && <RiskModal riskTypes={riskTypes} editingRisk={editingRisk} onClose={() => setEditingRisk(null)} onSave={(...args) => handleSaveRisk(editingRisk.id, ...args, true)} />}
         </div>
     );
 };
