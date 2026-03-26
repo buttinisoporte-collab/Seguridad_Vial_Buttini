@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, Tooltip } from 'react-leaflet';
 import L, { LatLngExpression, LatLng, Icon } from 'leaflet';
-import { pointToLineDistance } from '@turf/turf';
+
+// Importación estricta de utilidades de Turf para evitar crashes
+import { pointToLineDistance, point, lineString } from '@turf/turf';
+
 import { kml } from '@tmcw/togeojson';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -28,18 +31,33 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
-// FUNCIÓN CORREGIDA: Ahora le pasa el 'feature' completo a Turf en lugar del array de coordenadas
+// =========================================================================
+// FUNCIÓN BLINDADA CONTRA ERRORES "UNDEFINED LENGTH" DE TURF.JS
+// =========================================================================
 const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThreshold: number): boolean => {
-    if (!geoJson || !geoJson.features) return false;
-    const riskPoint =[position.lng, position.lat];
-    const features = geoJson.features.filter((feature): feature is GeoJSONFeature<GeoJSONLineString> => feature?.geometry?.type === 'LineString');
+    if (!geoJson || !Array.isArray(geoJson.features)) return false;
     
+    // 1. Creamos un objeto Point estrictamente tipado para Turf
+    const riskPoint = point([position.lng, position.lat]);
+    
+    const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => 
+        f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates)
+    );
+
     for (const feature of features) {
         try {
-            // Turf espera un objeto Feature, pasar feature resuelve el error 'length undefined'
-            if (pointToLineDistance(riskPoint, feature, { units: 'meters' }) <= distanceThreshold) return true;
+            // 2. Filtramos la ruta para limpiar puntos inválidos/nulos que rompen Turf
+            const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2);
+            
+            // 3. Turf solo acepta LineStrings con 2 o más puntos
+            if (validCoords.length >= 2) {
+                const line = lineString(validCoords as [number, number][]);
+                if (pointToLineDistance(riskPoint, line, { units: 'meters' }) <= distanceThreshold) {
+                    return true;
+                }
+            }
         } catch (e) {
-            console.warn("Error interno calculando distancia a ruta:", e);
+            console.warn("Turf omitió un segmento de ruta inválido:", e);
         }
     }
     return false;
@@ -50,7 +68,7 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
     useEffect(() => {
         const points: LatLngExpression[] =[];
         routes.forEach(route => {
-            if (route.geoJson && route.geoJson.features) {
+            if (route.geoJson && Array.isArray(route.geoJson.features)) {
                 route.geoJson.features.forEach(feature => {
                     if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
                         feature.geometry.coordinates.forEach(([lng, lat]) => points.push([lat, lng]));
@@ -71,29 +89,29 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 const App: React.FC = () => {
     const [isLoadingData, setIsLoadingData] = useState(true);
     
-    const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const[currentUser, setCurrentUser] = useState<User | null>(() => {
         const saved = localStorage.getItem('currentUser');
         return saved ? JSON.parse(saved) : null;
     });
 
-    const [activeTab, setActiveTab] = useState<AppTab>('routes');
-    const[showRisks, setShowRisks] = useState(true);
+    const[activeTab, setActiveTab] = useState<AppTab>('routes');
+    const [showRisks, setShowRisks] = useState(true);
     const [showIncidents, setShowIncidents] = useState(true);
-    const [filterGroup, setFilterGroup] = useState('');
-    const[filterLine, setFilterLine] = useState('');
+    const[filterGroup, setFilterGroup] = useState('');
+    const [filterLine, setFilterLine] = useState('');
     const [filterService, setFilterService] = useState('');
     const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
-    const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
+    const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const [users, setUsers] = useState<User[]>([]);
+    const[users, setUsers] = useState<User[]>([]);
     const [riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
     const[risks, setRisks] = useState<Risk[]>([]);
-    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
+    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const [isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
@@ -134,11 +152,19 @@ const App: React.FC = () => {
                 }
             } catch (err) {
                 console.warn("Usando Modo Local.", err);
-                setRoutes(JSON.parse(localStorage.getItem('routes') || '[]'));
-                setRisks(JSON.parse(localStorage.getItem('risks') || '[]'));
-                setRiskTypes(JSON.parse(localStorage.getItem('riskTypes') || '[]'));
+                
+                // Carga blindada de LocalStorage
+                const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]');
+                setRoutes(Array.isArray(localRoutes) ? localRoutes :[]);
+                
+                const localRisks = JSON.parse(localStorage.getItem('risks') || '[]');
+                setRisks(Array.isArray(localRisks) ? localRisks : []);
+                
+                const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]');
+                if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
+                
                 const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
-                if(localUsers.length > 0) setUsers(localUsers);
+                if(Array.isArray(localUsers) && localUsers.length > 0) setUsers(localUsers);
                 else {
                     const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Local', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings'] };
                     setUsers([defaultAdmin]);
@@ -298,7 +324,7 @@ const App: React.FC = () => {
 
     const visibleRisks = useMemo(() => {
         if (activeTab === 'routes') { const visibleRouteIds = new Set(visibleRoutes.map(r => r.id)); return baseVisibleRisks.filter(risk => (risk.associatedRouteIds ||[]).some(id => visibleRouteIds.has(id))); }
-        else if (activeTab === 'reports') return reportSelectedRouteId ? baseVisibleRisks.filter(risk => (risk.associatedRouteIds || []).includes(reportSelectedRouteId)) :[];
+        else if (activeTab === 'reports') return reportSelectedRouteId ? baseVisibleRisks.filter(risk => (risk.associatedRouteIds ||[]).includes(reportSelectedRouteId)) :[];
         else if (activeTab === 'riskViewer') return riskViewerSelectedTypes.length === 0 ?[] : baseVisibleRisks.filter(risk => riskViewerSelectedTypes.includes(risk.riskTypeId));
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
@@ -347,7 +373,7 @@ const App: React.FC = () => {
 
                     {visibleRoutes.map(route => {
                         const path: LatLngExpression[][] =[];
-                        if (route.geoJson && route.geoJson.features) {
+                        if (route.geoJson && Array.isArray(route.geoJson.features)) {
                             route.geoJson.features.forEach(feature => { 
                                 if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
                                     path.push(feature.geometry.coordinates.map((c: any) =>[c[1], c[0]])); 
@@ -402,7 +428,7 @@ const App: React.FC = () => {
                                     ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
                                    
                                     <div className="flex gap-2 items-center mb-2">
-                                        {risk.images && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
+                                        {risk.images && Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
                                         {risk.videoUrl && <a href={risk.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-sky-500"><Video size={20} /></a>}
                                         {risk.driveUrl && <a href={risk.driveUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-green-500"><Folder size={20} /></a>}
                                     </div>
