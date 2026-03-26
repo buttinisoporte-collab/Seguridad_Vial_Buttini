@@ -55,9 +55,6 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 };
 
 const App: React.FC = () => {
-    // ==========================================
-    // 1. ESTADOS Y HOOKS (Todos al inicio)
-    // ==========================================
     const [isLoadingData, setIsLoadingData] = useState(true);
     
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -66,23 +63,23 @@ const App: React.FC = () => {
     });
 
     const [activeTab, setActiveTab] = useState<AppTab>('routes');
-    const [showRisks, setShowRisks] = useState(true);
-    const [showIncidents, setShowIncidents] = useState(true);
+    const[showRisks, setShowRisks] = useState(true);
+    const[showIncidents, setShowIncidents] = useState(true);
     const[filterGroup, setFilterGroup] = useState('');
-    const [filterLine, setFilterLine] = useState('');
+    const[filterLine, setFilterLine] = useState('');
     const [filterService, setFilterService] = useState('');
     const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
-    const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const [users, setUsers] = useState<User[]>([]);
+    const[users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
-    const [risks, setRisks] = useState<Risk[]>([]);
-    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const[risks, setRisks] = useState<Risk[]>([]);
+    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
@@ -139,7 +136,6 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronizaciones Automáticas
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
@@ -211,7 +207,7 @@ const App: React.FC = () => {
     const handleLogout = useCallback(() => {
         setCurrentUser(null);
         localStorage.removeItem('currentUser');
-    }, []);
+    },[]);
 
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
         const associatedIds: string[] =[];
@@ -219,7 +215,7 @@ const App: React.FC = () => {
             if (route.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) associatedIds.push(route.id);
         });
         return associatedIds;
-    }, [routes, proximityDistance]);
+    },[routes, proximityDistance]);
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
@@ -240,7 +236,16 @@ const App: React.FC = () => {
         }
     },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
 
-    const handleDeleteRisk = useCallback((id: string) => { if (window.confirm("¿Eliminar este punto?")) setRisks(prev => prev.filter(r => r.id !== id)); },[]);
+    // ESTA FUNCIÓN AHORA VERIFICA QUE EL USUARIO SEA ADMIN PARA ELIMINAR
+    const handleDeleteRisk = useCallback((id: string) => { 
+        if (!currentUser?.isAdmin) {
+            alert("No tienes permisos para eliminar.");
+            return;
+        }
+        if (window.confirm("¿Está seguro que desea eliminar este punto?")) {
+            setRisks(prev => prev.filter(r => r.id !== id)); 
+        }
+    },[currentUser]);
    
     const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
@@ -283,10 +288,6 @@ const App: React.FC = () => {
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
-    // ==========================================
-    // 2. RENDERIZADOS CONDICIONALES (Después de los hooks)
-    // ==========================================
-
     if (isDriverMode) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
         return <DriverApp riskTypes={riskTypes} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
@@ -312,9 +313,6 @@ const App: React.FC = () => {
         );
     }
 
-    // ==========================================
-    // 3. RENDERIZADO PRINCIPAL (Logueado)
-    // ==========================================
     return (
         <div className="flex h-screen w-screen bg-gray-100 font-sans">
             <Panel
@@ -357,7 +355,10 @@ const App: React.FC = () => {
                                         {activeTab === 'riskTypes' && currentUser!.allowedTabs.includes('riskTypes') && (
                                             <div className="flex gap-1 ml-2">
                                                 {!risk.driverReportDetails && <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500"><Edit2 size={14} /></button>}
-                                                <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                                {/* SOLO ADMINS PUEDEN VER EL BOTON ELIMINAR AQUI */}
+                                                {currentUser!.isAdmin && (
+                                                    <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                                )}
                                             </div>
                                         )}
                                     </div>

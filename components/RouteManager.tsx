@@ -12,18 +12,20 @@ interface RouteManagerProps {
     filterLine: string; setFilterLine: (v: string) => void;
     filterService: string; setFilterService: (v: string) => void;
     activeRouteId: string | null; setActiveRouteId: (v: string | null) => void;
-    togglePublicRoute: (id: string) => void; // NUEVO
+    togglePublicRoute: (id: string) => void;
+    isAdmin: boolean; // NUEVA PROP PARA PERMISOS
 }
 
 export const RouteManager: React.FC<RouteManagerProps> = ({ 
     routes, onAddRoute, setRoutes,
     showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService,
-    activeRouteId, setActiveRouteId, togglePublicRoute
+    activeRouteId, setActiveRouteId, togglePublicRoute, isAdmin
 }) => {
     const[isModalOpen, setIsModalOpen] = useState(false);
     
     const deleteRoute = (id: string) => {
+        if (!isAdmin) return alert("No tienes permisos para eliminar.");
         if(window.confirm("¿Está seguro que desea eliminar este recorrido?")) {
             setRoutes(routes.filter(route => route.id !== id));
             if (activeRouteId === id) setActiveRouteId(null);
@@ -33,8 +35,6 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
     const handleShare = (e: React.MouseEvent, route: Route) => {
         e.stopPropagation();
         togglePublicRoute(route.id);
-        
-        // Si no era público, ahora lo es, por lo tanto copiamos el enlace generado
         if (!route.isPublic) {
             const url = `${window.location.origin}${window.location.pathname}?publicRoute=${route.id}`;
             navigator.clipboard.writeText(url).then(() => {
@@ -92,16 +92,15 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
                             <p className="text-xs text-gray-400">{route.origin} &rarr; {route.destination}</p>
                         </div>
                         <div className="flex items-center ml-2">
-                            <button 
-                                onClick={(e) => handleShare(e, route)} 
-                                className={`p-2 transition-colors ${route.isPublic ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-white'}`}
-                                title={route.isPublic ? "Deshabilitar acceso público" : "Habilitar acceso público a conductores"}
-                            >
+                            <button onClick={(e) => handleShare(e, route)} className={`p-2 transition-colors ${route.isPublic ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-white'}`} title={route.isPublic ? "Deshabilitar acceso público" : "Habilitar acceso público a conductores"}>
                                 <LinkIcon size={18} />
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); deleteRoute(route.id); }} className="text-red-400 hover:text-red-600 p-2 ml-1" title="Eliminar recorrido">
-                                <Trash2 size={18} />
-                            </button>
+                            {/* SOLO LOS ADMIN PUEDEN VER EL BOTON DE ELIMINAR */}
+                            {isAdmin && (
+                                <button onClick={(e) => { e.stopPropagation(); deleteRoute(route.id); }} className="text-red-400 hover:text-red-600 p-2 ml-1" title="Eliminar recorrido">
+                                    <Trash2 size={18} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 )) : (

@@ -49,8 +49,8 @@ export const Panel: React.FC<PanelProps> = ({
     const renderTabContent = () => {
         switch (activeTab) {
             case 'routes':
-                return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} />;
-            case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} />;
+                return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} isAdmin={currentUser.isAdmin} />;
+            case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
             case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} />;
@@ -60,9 +60,8 @@ export const Panel: React.FC<PanelProps> = ({
     };
     
     const TabButton: React.FC<{ tabName: AppTab; icon: React.ReactNode; label: string }> = ({ tabName, icon, label }) => {
-        // Lógica de Permisos: Si no es admin y no tiene el tab asignado, no renderizar botón
         if (!currentUser.isAdmin && !currentUser.allowedTabs.includes(tabName) && tabName !== 'users') return null;
-        if (tabName === 'users' && !currentUser.isAdmin) return null; // Solo admin ve Usuarios
+        if (tabName === 'users' && !currentUser.isAdmin) return null; 
 
         return (
             <button onClick={() => setActiveTab(tabName)} className={`flex flex-col items-center justify-center p-2 w-full text-xs transition-colors duration-200 ${activeTab === tabName ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-sky-800 hover:text-white'}`} title={label}>

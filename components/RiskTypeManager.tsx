@@ -6,9 +6,10 @@ import { AlertTriangle, Trash2, Edit } from 'lucide-react';
 interface RiskTypeManagerProps {
     riskTypes: RiskType[];
     setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
+    isAdmin: boolean; // NUEVA PROP
 }
 
-export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, setRiskTypes }) => {
+export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, setRiskTypes, isAdmin }) => {
     const[newTypeName, setNewTypeName] = useState('');
     const [newTypeColor, setNewTypeColor] = useState('#ffffff');
     const [isIncident, setIsIncident] = useState(false);
@@ -35,6 +36,7 @@ export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, set
     };
 
     const handleDelete = (id: string) => {
+        if (!isAdmin) return alert("No tienes permisos para eliminar.");
         if(window.confirm("¿Está seguro que desea eliminar este tipo de riesgo?")) setRiskTypes(riskTypes.filter(rt => rt.id !== id));
     };
     
@@ -75,7 +77,10 @@ export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, set
                         </div>
                         <div className="flex space-x-2">
                             <button onClick={() => handleEdit(rt)} className="text-yellow-400 hover:text-yellow-500 p-1"><Edit size={16} /></button>
-                            <button onClick={() => handleDelete(rt.id)} className="text-red-400 hover:text-red-500 p-1"><Trash2 size={16} /></button>
+                            {/* SOLO EL ADMIN PUEDE ELIMINAR CATEGORIAS */}
+                            {isAdmin && (
+                                <button onClick={() => handleDelete(rt.id)} className="text-red-400 hover:text-red-500 p-1"><Trash2 size={16} /></button>
+                            )}
                         </div>
                     </div>
                 )) : (
