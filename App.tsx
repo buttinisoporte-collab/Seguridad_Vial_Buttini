@@ -19,7 +19,7 @@ import {
     saveRiskToDB, loadRisksFromDB, deleteRiskFromDB,
     saveRiskTypeToDB, loadRiskTypesFromDB, deleteRiskTypeFromDB,
     saveUserToDB, loadUsersFromDB, deleteUserFromDB // NUEVOS MÉTODOS
-} from './src/lib/firebase';
+} from './lib/firebase';
 
 const SAN_RAFAEL_CENTER: LatLngExpression =[-34.6175, -68.335];
 
@@ -33,7 +33,7 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     const riskPoint =[position.lng, position.lat];
     const features = geoJson.features.filter((feature): feature is GeoJSONFeature<GeoJSONLineString> => feature.geometry.type === 'LineString');
     for (const feature of features) {
-        if (pointToLineDistance(riskPoint, feature.geometry.coordinates, { units: 'meters' }) <= distanceThreshold) return true;
+        if (pointToLineDistance(riskPoint, feature.geometry as any, { units: 'meters' }) <= distanceThreshold) return true;
     }
     return false;
 };
@@ -260,17 +260,21 @@ const App: React.FC = () => {
     const togglePublicRoute = (id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r));
     const handleMapClick = (latlng: LatLng) => {
         if (activeTab === 'riskTypes' && currentUser?.allowedTabs.includes('riskTypes')) {
-            setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
+            const pos = { lat: latlng.lat, lng: latlng.lng };
+            setNewRiskPosition(pos);
+            // Pre-calcular rutas asociadas por defecto
+            // No podemos usar findAssociatedRouteIds aquí directamente si queremos pasar los IDs al modal
+            // Pero el modal ya los recibirá si los calculamos antes de abrirlo
             setIsAddRiskModalOpen(true);
         }
     };
 
-    const handleSaveRisk = (id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
+    const handleSaveRisk = (id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, associatedRouteIds: string[], isEditing: boolean) => {
         if (isEditing && editingRisk) {
-            setRisks(prev => prev.map(r => r.id === id ? { ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(r.position) } : r));
+            setRisks(prev => prev.map(r => r.id === id ? { ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds } : r));
             setEditingRisk(null);
         } else if (newRiskPosition) {
-            setRisks(prev =>[...prev, { id, position: newRiskPosition, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(newRiskPosition) }]);
+            setRisks(prev =>[...prev, { id, position: newRiskPosition, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds }]);
             setIsAddRiskModalOpen(false); setNewRiskPosition(null);
         }
     };
@@ -404,8 +408,28 @@ const App: React.FC = () => {
                 </MapContainer>
             </main>
            
-            {isAddRiskModalOpen && newRiskPosition && <RiskModal riskTypes={riskTypes} onClose={() => setIsAddRiskModalOpen(false)} onSave={(...args) => handleSaveRisk(uuidv4(), ...args, false)} />}
-            {editingRisk && <RiskModal riskTypes={riskTypes} editingRisk={editingRisk} onClose={() => setEditingRisk(null)} onSave={(...args) => handleSaveRisk(editingRisk.id, ...args, true)} />}
+            {isAddRiskModalOpen && newRiskPosition && (
+                <RiskModal 
+                    riskTypes={riskTypes} 
+                    routes={routes}
+                    initialAssociatedRouteIds={findAssociatedRouteIds(newRiskPosition)}
+                    onClose={() => setIsAddRiskModalOpen(false)} 
+                    onSave={(riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds) => 
+                        handleSaveRisk(uuidv4(), riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds, false)
+                    } 
+                />
+            )}
+            {editingRisk && (
+                <RiskModal 
+                    riskTypes={riskTypes} 
+                    routes={routes}
+                    editingRisk={editingRisk} 
+                    onClose={() => setEditingRisk(null)} 
+                    onSave={(riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds) => 
+                        handleSaveRisk(editingRisk.id, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds, true)
+                    } 
+                />
+            )}
         </div>
     );
 };
