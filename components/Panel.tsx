@@ -1,14 +1,19 @@
 import React from 'react';
-import type { RiskType, Route, Risk } from '../types';
-import type { AppTab } from '../App';
+import type { RiskType, Route, Risk, AppTab, User } from '../types';
 import { RouteManager } from './RouteManager';
 import { RiskTypeManager } from './RiskTypeManager';
 import { ReportViewer } from './ReportViewer';
 import { RiskViewer } from './RiskViewer';
 import { Settings } from './Settings';
-import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon } from 'lucide-react';
+import { UserManager } from './UserManager';
+import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut } from 'lucide-react';
 
 interface PanelProps {
+    currentUser: User;
+    onLogout: () => void;
+    users: User[];
+    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+
     riskTypes: RiskType[]; setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
     routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
     risks: Risk[]; setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
@@ -28,10 +33,11 @@ interface PanelProps {
     reportSelectedRouteId: string; setReportSelectedRouteId: React.Dispatch<React.SetStateAction<string>>;
     riskViewerSelectedTypes: string[]; setRiskViewerSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
     
-    togglePublicRoute: (id: string) => void; // NUEVO
+    togglePublicRoute: (id: string) => void;
 }
 
 export const Panel: React.FC<PanelProps> = ({
+    currentUser, onLogout, users, setUsers,
     riskTypes, setRiskTypes, routes, setRoutes, risks, setRisks, proximityDistance,
     setProximityDistance, onAddRoute, getRiskType,
     activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
@@ -43,46 +49,47 @@ export const Panel: React.FC<PanelProps> = ({
     const renderTabContent = () => {
         switch (activeTab) {
             case 'routes':
-                return (
-                    <RouteManager 
-                        routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes}
-                        showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents}
-                        filterGroup={filterGroup} setFilterGroup={setFilterGroup}
-                        filterLine={filterLine} setFilterLine={setFilterLine}
-                        filterService={filterService} setFilterService={setFilterService}
-                        activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId}
-                        togglePublicRoute={togglePublicRoute}
-                    />
-                );
+                return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} />;
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
             case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} />;
+            case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
             default: return null;
         }
     };
     
-    const TabButton: React.FC<{ tabName: AppTab; icon: React.ReactNode; label: string }> = ({ tabName, icon, label }) => (
-        <button
-            onClick={() => setActiveTab(tabName)}
-            className={`flex flex-col items-center justify-center p-2 w-full text-xs transition-colors duration-200 ${
-                activeTab === tabName ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-sky-800 hover:text-white'
-            }`} title={label}
-        >
-            {icon}
-            <span className="mt-1 text-center leading-tight">{label}</span>
-        </button>
-    );
+    const TabButton: React.FC<{ tabName: AppTab; icon: React.ReactNode; label: string }> = ({ tabName, icon, label }) => {
+        // Lógica de Permisos: Si no es admin y no tiene el tab asignado, no renderizar botón
+        if (!currentUser.isAdmin && !currentUser.allowedTabs.includes(tabName) && tabName !== 'users') return null;
+        if (tabName === 'users' && !currentUser.isAdmin) return null; // Solo admin ve Usuarios
+
+        return (
+            <button onClick={() => setActiveTab(tabName)} className={`flex flex-col items-center justify-center p-2 w-full text-xs transition-colors duration-200 ${activeTab === tabName ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-sky-800 hover:text-white'}`} title={label}>
+                {icon}
+                <span className="mt-1 text-center leading-tight">{label}</span>
+            </button>
+        );
+    };
 
     return (
-        <aside className="w-[400px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0">
-            <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-2 overflow-y-auto">
-                 <div className="flex items-center text-sky-400 mb-2"><Map size={32} /></div>
+        <aside className="w-[400px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
+            <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
+                 <div className="flex items-center text-sky-400 mb-2" title={`Conectado como: ${currentUser.name}`}><Map size={32} /></div>
+                
                 <TabButton tabName="routes" icon={<MapPin size={24} />} label="Recorridos" />
                 <TabButton tabName="riskTypes" icon={<AlertTriangle size={24} />} label="Cargar" />
                 <TabButton tabName="riskViewer" icon={<Layers size={24} />} label="Visor" />
                 <TabButton tabName="reports" icon={<FileBarChart size={24} />} label="Reportes" />
                 <TabButton tabName="settings" icon={<SettingsIcon size={24} />} label="Ajustes" />
+                <TabButton tabName="users" icon={<Users size={24} />} label="Usuarios" />
+
+                <div className="flex-1"></div>
+                
+                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-auto" title="Cerrar Sesión">
+                    <LogOut size={24} />
+                    <span className="mt-1 text-center leading-tight">Salir</span>
+                </button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
         </aside>

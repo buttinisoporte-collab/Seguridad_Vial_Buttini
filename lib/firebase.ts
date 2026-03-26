@@ -1,8 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
-import type { Route, Risk, RiskType } from '../types';
+import type { Route, Risk, RiskType, User } from '../types';
 
-// 👇 REEMPLAZA ESTO CON LO QUE TE DIO FIREBASE 👇
+// 👇 MANTÉN TUS CLAVES AQUÍ 👇
 const firebaseConfig = {
   apiKey: "AIzaSyBiSZHiOG4NPh7nC298DG48t2ARPbR0kWs",
   authDomain: "riesgo-vial.firebaseapp.com",
@@ -11,13 +11,11 @@ const firebaseConfig = {
   messagingSenderId: "204923217648",
   appId: "1:204923217648:web:5b655f6469f5ad306e0435"
 };
-// 👆 ------------------------------------------- 👆
 
 let db: any;
 try {
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("🔥 Firebase conectado correctamente");
 } catch (error) {
     console.warn("Error conectando Firebase:", error);
 }
@@ -42,3 +40,11 @@ export const loadRiskTypesFromDB = async (): Promise<RiskType[]> => {
     return (await getDocs(collection(db, "riskTypes"))).docs.map(d => d.data() as RiskType); 
 };
 export const deleteRiskTypeFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "riskTypes", id)); };
+
+// NUEVO: Funciones de Usuario
+export const saveUserToDB = async (user: User) => { if(db) await setDoc(doc(db, "users", user.id), user); };
+export const loadUsersFromDB = async (): Promise<User[]> => { 
+    if(!db) throw new Error("No DB"); 
+    return (await getDocs(collection(db, "users"))).docs.map(d => d.data() as User); 
+};
+export const deleteUserFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "users", id)); };
