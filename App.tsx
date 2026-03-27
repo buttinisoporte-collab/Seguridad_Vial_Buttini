@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, Tooltip } from 'react-leaflet';
 import L, { LatLngExpression, LatLng, Icon } from 'leaflet';
-
-// Importación estricta de utilidades de Turf para evitar crashes
 import { pointToLineDistance, point, lineString } from '@turf/turf';
-
 import { kml } from '@tmcw/togeojson';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -31,54 +28,65 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
-// =========================================================================
-// FUNCIÓN BLINDADA CONTRA ERRORES "UNDEFINED LENGTH" DE TURF.JS
-// =========================================================================
+// ==========================================
+// FUNCIÓN MATEMÁTICA BLINDADA
+// ==========================================
 const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThreshold: number): boolean => {
-    if (!geoJson || !Array.isArray(geoJson.features)) return false;
-    
-    // 1. Creamos un objeto Point estrictamente tipado para Turf
-    const riskPoint = point([position.lng, position.lat]);
-    
-    const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => 
-        f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates)
-    );
+    if (!geoJson || !Array.isArray(geoJson.features) || !position || typeof position.lat !== 'number' || typeof position.lng !== 'number') return false;
 
-    for (const feature of features) {
-        try {
-            // 2. Filtramos la ruta para limpiar puntos inválidos/nulos que rompen Turf
-            const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2);
-            
-            // 3. Turf solo acepta LineStrings con 2 o más puntos
+    try {
+        const riskPoint = point([position.lng, position.lat]);
+        const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => 
+            f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates)
+        );
+
+        for (const feature of features) {
+            // Limpiamos los puntos para asegurar que Turf no reciba datos vacíos
+            const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number');
             if (validCoords.length >= 2) {
                 const line = lineString(validCoords as [number, number][]);
                 if (pointToLineDistance(riskPoint, line, { units: 'meters' }) <= distanceThreshold) {
                     return true;
                 }
             }
-        } catch (e) {
-            console.warn("Turf omitió un segmento de ruta inválido:", e);
         }
+    } catch (e) {
+        console.warn("Se omitió el cálculo para un segmento inválido:", e);
     }
     return false;
 };
 
+// ==========================================
+// ACTUALIZADOR DE MAPA BLINDADO
+// ==========================================
 const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes, risks }) => {
     const map = useMap();
     useEffect(() => {
         const points: LatLngExpression[] =[];
-        routes.forEach(route => {
-            if (route.geoJson && Array.isArray(route.geoJson.features)) {
-                route.geoJson.features.forEach(feature => {
-                    if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
-                        feature.geometry.coordinates.forEach(([lng, lat]) => points.push([lat, lng]));
-                    }
-                });
-            }
-        });
-        risks.forEach(risk => {
-            if (risk && risk.position) points.push([risk.position.lat, risk.position.lng]);
-        });
+        
+        if (Array.isArray(routes)) {
+            routes.forEach(route => {
+                if (route?.geoJson && Array.isArray(route.geoJson.features)) {
+                    route.geoJson.features.forEach(feature => {
+                        if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
+                            feature.geometry.coordinates.forEach(c => {
+                                if (Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
+                                    points.push([c[1], c[0]]);
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        if (Array.isArray(risks)) {
+            risks.forEach(risk => {
+                if (risk?.position && typeof risk.position.lat === 'number' && typeof risk.position.lng === 'number') {
+                    points.push([risk.position.lat, risk.position.lng]);
+                }
+            });
+        }
         
         if (points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
@@ -89,7 +97,7 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 const App: React.FC = () => {
     const [isLoadingData, setIsLoadingData] = useState(true);
     
-    const[currentUser, setCurrentUser] = useState<User | null>(() => {
+    const [currentUser, setCurrentUser] = useState<User | null>(() => {
         const saved = localStorage.getItem('currentUser');
         return saved ? JSON.parse(saved) : null;
     });
@@ -97,21 +105,21 @@ const App: React.FC = () => {
     const[activeTab, setActiveTab] = useState<AppTab>('routes');
     const [showRisks, setShowRisks] = useState(true);
     const [showIncidents, setShowIncidents] = useState(true);
-    const[filterGroup, setFilterGroup] = useState('');
+    const [filterGroup, setFilterGroup] = useState('');
     const [filterLine, setFilterLine] = useState('');
-    const [filterService, setFilterService] = useState('');
+    const[filterService, setFilterService] = useState('');
     const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
-    const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const[users, setUsers] = useState<User[]>([]);
-    const [riskTypes, setRiskTypes] = useState<RiskType[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
-    const[risks, setRisks] = useState<Risk[]>([]);
+    const [risks, setRisks] = useState<Risk[]>([]);
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const [isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
-    const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
+    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
@@ -130,11 +138,16 @@ const App: React.FC = () => {
                     loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB()
                 ]);
 
-                setRoutes(dbRoutes); prevRoutesRef.current = dbRoutes;
-                setRisks(dbRisks); prevRisksRef.current = dbRisks;
+                setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); 
+                prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
+                
+                setRisks(Array.isArray(dbRisks) ? dbRisks :[]); 
+                prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
 
-                if (dbRiskTypes.length > 0) { setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; } 
-                else {
+                if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { 
+                    setRiskTypes(dbRiskTypes); 
+                    prevRiskTypesRef.current = dbRiskTypes; 
+                } else {
                     const defaultTypes: RiskType[] =[
                         { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false },
                         { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false },
@@ -145,20 +158,19 @@ const App: React.FC = () => {
                     setRiskTypes(defaultTypes); defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{})); prevRiskTypesRef.current = defaultTypes;
                 }
 
-                if (dbUsers.length > 0) { setUsers(dbUsers); prevUsersRef.current = dbUsers; } 
-                else {
-                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings'] };
-                    setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current = [defaultAdmin];
+                if (Array.isArray(dbUsers) && dbUsers.length > 0) { 
+                    setUsers(dbUsers); prevUsersRef.current = dbUsers; 
+                } else {
+                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users'] };
+                    setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
             } catch (err) {
                 console.warn("Usando Modo Local.", err);
-                
-                // Carga blindada de LocalStorage
                 const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]');
                 setRoutes(Array.isArray(localRoutes) ? localRoutes :[]);
                 
                 const localRisks = JSON.parse(localStorage.getItem('risks') || '[]');
-                setRisks(Array.isArray(localRisks) ? localRisks : []);
+                setRisks(Array.isArray(localRisks) ? localRisks :[]);
                 
                 const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]');
                 if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
@@ -166,7 +178,7 @@ const App: React.FC = () => {
                 const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
                 if(Array.isArray(localUsers) && localUsers.length > 0) setUsers(localUsers);
                 else {
-                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Local', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings'] };
+                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Local', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users'] };
                     setUsers([defaultAdmin]);
                 }
             } finally {
@@ -242,7 +254,7 @@ const App: React.FC = () => {
         setCurrentUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
         if (user.isAdmin) setActiveTab('routes');
-        else if (user.allowedTabs && user.allowedTabs.length > 0) setActiveTab(user.allowedTabs[0]);
+        else if (Array.isArray(user.allowedTabs) && user.allowedTabs.length > 0) setActiveTab(user.allowedTabs[0]);
     },[]);
 
     const handleLogout = useCallback(() => {
@@ -252,28 +264,30 @@ const App: React.FC = () => {
 
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
         const associatedIds: string[] =[];
-        routes.forEach(route => {
-            if (route.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) associatedIds.push(route.id);
-        });
+        if (Array.isArray(routes)) {
+            routes.forEach(route => {
+                if (route?.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) associatedIds.push(route.id);
+            });
+        }
         return associatedIds;
     },[routes, proximityDistance]);
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
     const handleMapClick = useCallback((latlng: LatLng) => {
-        const allowedTabs = currentUser?.allowedTabs ||[];
+        const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) {
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
             setIsAddRiskModalOpen(true);
         }
-    }, [activeTab, currentUser]);
+    },[activeTab, currentUser]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
-            setRisks(prev => prev.map(r => r.id === id ? { ...r, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(r.position) } : r));
+            setRisks(prev => prev.map(r => r.id === id ? { ...r, riskTypeId, description, images: Array.isArray(images) ? images :[], videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(r.position) } : r));
             setEditingRisk(null);
         } else if (newRiskPosition) {
-            setRisks(prev =>[...prev, { id, position: newRiskPosition, riskTypeId, description, images, videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(newRiskPosition) }]);
+            setRisks(prev =>[...prev, { id, position: newRiskPosition, riskTypeId, description, images: Array.isArray(images) ? images : [], videoUrl, driveUrl, associatedRouteIds: findAssociatedRouteIds(newRiskPosition) }]);
             setIsAddRiskModalOpen(false); setNewRiskPosition(null);
         }
     },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
@@ -295,37 +309,38 @@ const App: React.FC = () => {
                 const geoJson = kml(new DOMParser().parseFromString(event.target?.result as string, 'application/xml')) as any;
                 const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
                 setRoutes(prev =>[...prev, newRoute]);
-                setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, geoJson, proximityDistance) ? { ...risk, associatedRouteIds:[...new Set([...(risk.associatedRouteIds || []), newRoute.id])] } : risk));
+                setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, geoJson, proximityDistance) ? { ...risk, associatedRouteIds:[...new Set([...(Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []), newRoute.id])] } : risk));
             } catch (error) { alert("Error al procesar el archivo KML."); }
         };
         reader.readAsText(kmlFile);
-    }, [proximityDistance]);
+    },[proximityDistance]);
    
     const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
 
-    const baseVisibleRisks = useMemo(() => risks.filter(risk => {
+    const baseVisibleRisks = useMemo(() => Array.isArray(risks) ? risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
         if (!rt) return false;
         if (rt.isIncident && !showIncidents) return false;
         if (!rt.isIncident && !showRisks) return false;
         return true;
-    }),[risks, getRiskType, showRisks, showIncidents]);
+    }) : [], [risks, getRiskType, showRisks, showIncidents]);
 
     const visibleRoutes = useMemo(() => {
-        if (activeTab === 'routes') return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || route.group.toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || route.line.toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || route.service.toLowerCase().includes(filterService.toLowerCase())));
+        if (!Array.isArray(routes)) return[];
+        if (activeTab === 'routes') return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || (route.group||'').toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || (route.line||'').toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || (route.service||'').toLowerCase().includes(filterService.toLowerCase())));
         else if (activeTab === 'reports') return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) :[];
         else if (activeTab === 'riskViewer') {
             const affectedRouteIds = new Set<string>();
-            baseVisibleRisks.forEach(risk => { if (riskViewerSelectedTypes.includes(risk.riskTypeId)) (risk.associatedRouteIds ||[]).forEach(id => affectedRouteIds.add(id)); });
+            baseVisibleRisks.forEach(risk => { if (Array.isArray(riskViewerSelectedTypes) && riskViewerSelectedTypes.includes(risk.riskTypeId)) (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).forEach(id => affectedRouteIds.add(id)); });
             return routes.filter(route => affectedRouteIds.has(route.id));
         }
         return routes;
     },[routes, activeTab, filterGroup, filterLine, filterService, activeRouteId, reportSelectedRouteId, riskViewerSelectedTypes, baseVisibleRisks]);
 
     const visibleRisks = useMemo(() => {
-        if (activeTab === 'routes') { const visibleRouteIds = new Set(visibleRoutes.map(r => r.id)); return baseVisibleRisks.filter(risk => (risk.associatedRouteIds ||[]).some(id => visibleRouteIds.has(id))); }
-        else if (activeTab === 'reports') return reportSelectedRouteId ? baseVisibleRisks.filter(risk => (risk.associatedRouteIds ||[]).includes(reportSelectedRouteId)) :[];
-        else if (activeTab === 'riskViewer') return riskViewerSelectedTypes.length === 0 ?[] : baseVisibleRisks.filter(risk => riskViewerSelectedTypes.includes(risk.riskTypeId));
+        if (activeTab === 'routes') { const visibleRouteIds = new Set(visibleRoutes.map(r => r.id)); return baseVisibleRisks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).some(id => visibleRouteIds.has(id))); }
+        else if (activeTab === 'reports') return reportSelectedRouteId ? baseVisibleRisks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(reportSelectedRouteId)) :[];
+        else if (activeTab === 'riskViewer') return (!Array.isArray(riskViewerSelectedTypes) || riskViewerSelectedTypes.length === 0) ?[] : baseVisibleRisks.filter(risk => riskViewerSelectedTypes.includes(risk.riskTypeId));
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
@@ -336,8 +351,8 @@ const App: React.FC = () => {
 
     if (publicRouteId) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
-        const publicRoute = routes.find(r => r.id === publicRouteId);
-        if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={risks.filter(risk => (risk.associatedRouteIds ||[]).includes(publicRouteId))} riskTypes={riskTypes} />;
+        const publicRoute = Array.isArray(routes) ? routes.find(r => r.id === publicRouteId) : null;
+        if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []).includes(publicRouteId)) :[]} riskTypes={riskTypes} />;
         return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
     }
 
@@ -369,26 +384,31 @@ const App: React.FC = () => {
                  <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
                     <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} />
-                    {activeTab === 'riskTypes' && (currentUser?.allowedTabs ||[]).includes('riskTypes') && <MapClickHandler onMapClick={handleMapClick} />}
+                    {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <MapClickHandler onMapClick={handleMapClick} />}
 
                     {visibleRoutes.map(route => {
                         const path: LatLngExpression[][] =[];
-                        if (route.geoJson && Array.isArray(route.geoJson.features)) {
+                        if (route?.geoJson && Array.isArray(route.geoJson.features)) {
                             route.geoJson.features.forEach(feature => { 
                                 if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
-                                    path.push(feature.geometry.coordinates.map((c: any) =>[c[1], c[0]])); 
+                                    const validSegment = feature.geometry.coordinates
+                                        .filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number')
+                                        .map((c: any) => [c[1], c[0]] as LatLngExpression);
+                                    if (validSegment.length > 0) path.push(validSegment);
                                 }
                             });
                         }
+                        if (path.length === 0) return null;
                         const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer') ? 1 : 0.4;
                         return <Polyline key={route.id} positions={path} color="#0284c7" weight={5} opacity={opacity} />;
                     })}
 
                     {visibleRisks.map(risk => {
+                        if (!risk?.position || typeof risk.position.lat !== 'number' || typeof risk.position.lng !== 'number') return null;
                         const riskType = getRiskType(risk.riskTypeId);
                         if (!riskType) return null;
                         const icon = createRiskIcon(riskType.color);
-                        const associatedRoutes = routes.filter(r => (risk.associatedRouteIds ||[]).includes(r.id));
+                        const associatedRoutes = routes.filter(r => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(r.id));
                        
                         return (
                              <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
@@ -399,7 +419,7 @@ const App: React.FC = () => {
                                             <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
                                             <div className="text-[10px] text-gray-500 uppercase tracking-wide">{risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}</div>
                                         </div>
-                                        {activeTab === 'riskTypes' && (currentUser?.allowedTabs ||[]).includes('riskTypes') && (
+                                        {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
                                             <div className="flex gap-1 ml-2">
                                                 {!risk.driverReportDetails && <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500"><Edit2 size={14} /></button>}
                                                 {currentUser?.isAdmin && (
@@ -428,7 +448,7 @@ const App: React.FC = () => {
                                     ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
                                    
                                     <div className="flex gap-2 items-center mb-2">
-                                        {risk.images && Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
+                                        {Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
                                         {risk.videoUrl && <a href={risk.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-sky-500"><Video size={20} /></a>}
                                         {risk.driveUrl && <a href={risk.driveUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-green-500"><Folder size={20} /></a>}
                                     </div>
@@ -443,7 +463,7 @@ const App: React.FC = () => {
                             </Marker>
                         )
                     })}
-                    {newRiskPosition && activeTab === 'riskTypes' && (currentUser?.allowedTabs || []).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
+                    {newRiskPosition && activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
                 </MapContainer>
             </main>
            
