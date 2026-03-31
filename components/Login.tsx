@@ -1,90 +1,71 @@
 import React, { useState } from 'react';
-import { User } from '../types';
-import { Shield, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Bus } from 'lucide-react';
+import type { User } from '../types';
 
 interface LoginProps {
     users: User[];
     onLogin: (user: User) => void;
+    isDriverMode?: boolean; // NUEVO: Define cómo se ve y actúa el login
 }
 
-export const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
+export const Login: React.FC<LoginProps> = ({ users, onLogin, isDriverMode }) => {
     const [username, setUsername] = useState('');
-    const [pin, setPin] = useState('');
+    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-
-        const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.pin === pin);
         
-        if (user) {
-            onLogin(user);
+        // Filtra usuarios basado en el modo en que estamos
+        const foundUser = users.find(u => 
+            u.username.toLowerCase() === username.toLowerCase() && 
+            u.pin === password &&
+            (isDriverMode ? u.isDriver : !u.isDriver) // Bloquea acceso cruzado
+        );
+        
+        if (foundUser) {
+            setError('');
+            onLogin(foundUser);
         } else {
-            setError('Usuario o PIN incorrectos');
+            setError(isDriverMode 
+                ? 'Legajo o contraseña incorrectos, o usuario sin perfil de Conductor.' 
+                : 'Usuario o contraseña incorrectos, o no tiene perfil de Operador/Admin.');
         }
     };
 
     return (
-        <div className="flex h-screen w-screen items-center justify-center bg-gray-900 p-4">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div className="bg-sky-600 p-8 text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4">
-                        <Shield className="text-white" size={32} />
-                    </div>
-                    <h1 className="text-2xl font-bold text-white">Sistema Seguro</h1>
-                    <p className="text-sky-100 text-sm">Gestión de Riesgos Viales</p>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                    {error && (
-                        <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
-                            <AlertCircle size={18} />
-                            <span>{error}</span>
-                        </div>
-                    )}
-                    
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <UserIcon size={16} /> Usuario
-                        </label>
-                        <input 
-                            type="text" 
-                            value={username} 
-                            onChange={(e) => setUsername(e.target.value)}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
-                            placeholder="Ingrese su usuario"
-                            required
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <Lock size={16} /> PIN de Acceso
-                        </label>
-                        <input 
-                            type="password" 
-                            value={pin} 
-                            onChange={(e) => setPin(e.target.value)}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
-                            placeholder="••••"
-                            required
-                        />
-                    </div>
-
-                    <button 
-                        type="submit"
-                        className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg shadow-lg shadow-sky-600/20 transition-all transform active:scale-[0.98]"
-                    >
-                        Ingresar al Sistema
-                    </button>
-                </form>
-                
-                <div className="px-8 pb-8 text-center">
-                    <p className="text-xs text-gray-400 italic">
-                        Acceso restringido a personal autorizado.
+        <div className="flex h-screen w-screen items-center justify-center bg-gray-900">
+            <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md m-4">
+                <div className="flex flex-col items-center mb-6 text-center">
+                    {isDriverMode 
+                        ? <Bus size={56} className="text-green-500 mb-3" />
+                        : <ShieldCheck size={56} className="text-sky-500 mb-3" />
+                    }
+                    <h1 className="text-2xl font-bold text-white">
+                        {isDriverMode ? 'Módulo Conductor' : 'Sistema de Gestión'}
+                    </h1>
+                    <p className="text-sm text-gray-400">
+                        {isDriverMode ? 'Reporte de Novedades en Ruta (IRAM 3810)' : 'Riesgo Vial y Novedades'}
                     </p>
                 </div>
+                
+                {error && <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded-lg mb-4 text-sm text-center">{error}</div>}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            {isDriverMode ? 'Número de Legajo' : 'Usuario'}
+                        </label>
+                        <input type="text" value={username} onChange={e=>setUsername(e.target.value)} required className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-sky-500 outline-none" placeholder={isDriverMode ? "Ej: 1234" : "Ej: admin"} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Contraseña / PIN</label>
+                        <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-sky-500 outline-none" placeholder="••••" />
+                    </div>
+                    <button type="submit" className={`w-full text-white font-bold py-3 px-4 rounded-lg transition-colors mt-2 ${isDriverMode ? 'bg-green-600 hover:bg-green-500' : 'bg-sky-600 hover:bg-sky-500'}`}>
+                        Ingresar
+                    </button>
+                </form>
             </div>
         </div>
     );

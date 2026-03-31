@@ -28,9 +28,6 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
-// ==========================================
-// FUNCIÓN MATEMÁTICA BLINDADA
-// ==========================================
 const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThreshold: number): boolean => {
     if (!geoJson || !Array.isArray(geoJson.features) || !position || typeof position.lat !== 'number' || typeof position.lng !== 'number') return false;
 
@@ -41,7 +38,6 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
         );
 
         for (const feature of features) {
-            // Limpiamos los puntos para asegurar que Turf no reciba datos vacíos
             const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number');
             if (validCoords.length >= 2) {
                 const line = lineString(validCoords as [number, number][]);
@@ -56,38 +52,28 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     return false;
 };
 
-// ==========================================
-// ACTUALIZADOR DE MAPA BLINDADO
-// ==========================================
 const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes, risks }) => {
     const map = useMap();
     useEffect(() => {
         const points: LatLngExpression[] =[];
-        
         if (Array.isArray(routes)) {
             routes.forEach(route => {
                 if (route?.geoJson && Array.isArray(route.geoJson.features)) {
                     route.geoJson.features.forEach(feature => {
                         if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
                             feature.geometry.coordinates.forEach(c => {
-                                if (Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
-                                    points.push([c[1], c[0]]);
-                                }
+                                if (Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') points.push([c[1], c[0]]);
                             });
                         }
                     });
                 }
             });
         }
-
         if (Array.isArray(risks)) {
             risks.forEach(risk => {
-                if (risk?.position && typeof risk.position.lat === 'number' && typeof risk.position.lng === 'number') {
-                    points.push([risk.position.lat, risk.position.lng]);
-                }
+                if (risk?.position && typeof risk.position.lat === 'number' && typeof risk.position.lng === 'number') points.push([risk.position.lat, risk.position.lng]);
             });
         }
-        
         if (points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
     },[routes, risks, map]);
@@ -95,20 +81,26 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 };
 
 const App: React.FC = () => {
-    const [isLoadingData, setIsLoadingData] = useState(true);
+    const[isLoadingData, setIsLoadingData] = useState(true);
     
     const [currentUser, setCurrentUser] = useState<User | null>(() => {
         const saved = localStorage.getItem('currentUser');
         return saved ? JSON.parse(saved) : null;
     });
 
-    const[activeTab, setActiveTab] = useState<AppTab>('routes');
-    const [showRisks, setShowRisks] = useState(true);
-    const [showIncidents, setShowIncidents] = useState(true);
+    // SESIÓN INDEPENDIENTE PARA EL CONDUCTOR
+    const [currentDriver, setCurrentDriver] = useState<User | null>(() => {
+        const saved = localStorage.getItem('currentDriver');
+        return saved ? JSON.parse(saved) : null;
+    });
+
+    const [activeTab, setActiveTab] = useState<AppTab>('routes');
+    const[showRisks, setShowRisks] = useState(true);
+    const[showIncidents, setShowIncidents] = useState(true);
     const [filterGroup, setFilterGroup] = useState('');
-    const [filterLine, setFilterLine] = useState('');
-    const[filterService, setFilterService] = useState('');
-    const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
+    const[filterLine, setFilterLine] = useState('');
+    const [filterService, setFilterService] = useState('');
+    const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
@@ -118,8 +110,8 @@ const App: React.FC = () => {
     const [risks, setRisks] = useState<Risk[]>([]);
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const [isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
-    const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
+    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
@@ -138,16 +130,11 @@ const App: React.FC = () => {
                     loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB()
                 ]);
 
-                setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); 
-                prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
-                
-                setRisks(Array.isArray(dbRisks) ? dbRisks :[]); 
-                prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
+                setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
+                setRisks(Array.isArray(dbRisks) ? dbRisks :[]); prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
 
-                if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { 
-                    setRiskTypes(dbRiskTypes); 
-                    prevRiskTypesRef.current = dbRiskTypes; 
-                } else {
+                if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; } 
+                else {
                     const defaultTypes: RiskType[] =[
                         { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false },
                         { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false },
@@ -158,22 +145,16 @@ const App: React.FC = () => {
                     setRiskTypes(defaultTypes); defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{})); prevRiskTypesRef.current = defaultTypes;
                 }
 
-                if (Array.isArray(dbUsers) && dbUsers.length > 0) { 
-                    setUsers(dbUsers); prevUsersRef.current = dbUsers; 
-                } else {
+                if (Array.isArray(dbUsers) && dbUsers.length > 0) { setUsers(dbUsers); prevUsersRef.current = dbUsers; } 
+                else {
                     const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users'] };
                     setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
             } catch (err) {
                 console.warn("Usando Modo Local.", err);
-                const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]');
-                setRoutes(Array.isArray(localRoutes) ? localRoutes :[]);
-                
-                const localRisks = JSON.parse(localStorage.getItem('risks') || '[]');
-                setRisks(Array.isArray(localRisks) ? localRisks :[]);
-                
-                const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]');
-                if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
+                const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]'); setRoutes(Array.isArray(localRoutes) ? localRoutes :[]);
+                const localRisks = JSON.parse(localStorage.getItem('risks') || '[]'); setRisks(Array.isArray(localRisks) ? localRisks :[]);
+                const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]'); if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
                 
                 const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
                 if(Array.isArray(localUsers) && localUsers.length > 0) setUsers(localUsers);
@@ -188,7 +169,7 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronizaciones Automáticas
+    // Sincronizaciones DB y LocalStorage...
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
@@ -232,42 +213,43 @@ const App: React.FC = () => {
         added.forEach(c => saveUserToDB(c).catch(()=>{}));
         prevUsersRef.current = users;
         
+        // Auto-actualización de sesión WEB
         if (currentUser) {
             const updatedMe = users.find(u => u.id === currentUser.id);
             if (updatedMe && JSON.stringify(updatedMe) !== JSON.stringify(currentUser)) {
-                setCurrentUser(updatedMe);
-                localStorage.setItem('currentUser', JSON.stringify(updatedMe));
+                setCurrentUser(updatedMe); localStorage.setItem('currentUser', JSON.stringify(updatedMe));
             } else if (!updatedMe) {
-                setCurrentUser(null);
-                localStorage.removeItem('currentUser');
+                setCurrentUser(null); localStorage.removeItem('currentUser');
             }
         }
-    },[users, isLoadingData, currentUser]);
+
+        // Auto-actualización de sesión CONDUCTOR
+        if (currentDriver) {
+            const updatedDriver = users.find(u => u.id === currentDriver.id);
+            if (updatedDriver && JSON.stringify(updatedDriver) !== JSON.stringify(currentDriver)) {
+                setCurrentDriver(updatedDriver); localStorage.setItem('currentDriver', JSON.stringify(updatedDriver));
+            } else if (!updatedDriver) {
+                setCurrentDriver(null); localStorage.removeItem('currentDriver');
+            }
+        }
+    },[users, isLoadingData, currentUser, currentDriver]);
 
     useEffect(() => { localStorage.setItem('proximityDistance', proximityDistance.toString()); },[proximityDistance]);
     
-    useEffect(() => {
-        setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null);
-    },[activeTab]);
+    useEffect(() => { setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null); },[activeTab]);
 
     const handleLogin = useCallback((user: User) => {
-        setCurrentUser(user);
-        localStorage.setItem('currentUser', JSON.stringify(user));
+        setCurrentUser(user); localStorage.setItem('currentUser', JSON.stringify(user));
         if (user.isAdmin) setActiveTab('routes');
         else if (Array.isArray(user.allowedTabs) && user.allowedTabs.length > 0) setActiveTab(user.allowedTabs[0]);
     },[]);
 
-    const handleLogout = useCallback(() => {
-        setCurrentUser(null);
-        localStorage.removeItem('currentUser');
-    },[]);
+    const handleLogout = useCallback(() => { setCurrentUser(null); localStorage.removeItem('currentUser'); },[]);
 
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
         const associatedIds: string[] =[];
         if (Array.isArray(routes)) {
-            routes.forEach(route => {
-                if (route?.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) associatedIds.push(route.id);
-            });
+            routes.forEach(route => { if (route?.geoJson && isPointNearRoute(position, route.geoJson, proximityDistance)) associatedIds.push(route.id); });
         }
         return associatedIds;
     },[routes, proximityDistance]);
@@ -277,10 +259,9 @@ const App: React.FC = () => {
     const handleMapClick = useCallback((latlng: LatLng) => {
         const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) {
-            setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
-            setIsAddRiskModalOpen(true);
+            setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true);
         }
-    },[activeTab, currentUser]);
+    }, [activeTab, currentUser]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
@@ -293,13 +274,8 @@ const App: React.FC = () => {
     },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
 
     const handleDeleteRisk = useCallback((id: string) => { 
-        if (!currentUser?.isAdmin) {
-            alert("No tienes permisos para eliminar.");
-            return;
-        }
-        if (window.confirm("¿Está seguro que desea eliminar este punto?")) {
-            setRisks(prev => prev.filter(r => r.id !== id)); 
-        }
+        if (!currentUser?.isAdmin) return alert("No tienes permisos para eliminar.");
+        if (window.confirm("¿Está seguro que desea eliminar este punto?")) setRisks(prev => prev.filter(r => r.id !== id)); 
     },[currentUser]);
    
     const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
@@ -323,7 +299,7 @@ const App: React.FC = () => {
         if (rt.isIncident && !showIncidents) return false;
         if (!rt.isIncident && !showRisks) return false;
         return true;
-    }) : [], [risks, getRiskType, showRisks, showIncidents]);
+    }) : [],[risks, getRiskType, showRisks, showIncidents]);
 
     const visibleRoutes = useMemo(() => {
         if (!Array.isArray(routes)) return[];
@@ -344,11 +320,30 @@ const App: React.FC = () => {
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
+    // ==============================================================
+    // 1. MODO CONDUCTOR: Acceso Asegurado
+    // ==============================================================
     if (isDriverMode) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
-        return <DriverApp riskTypes={riskTypes} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
+        
+        if (!currentDriver) {
+            return <Login users={users} isDriverMode={true} onLogin={(driver) => {
+                setCurrentDriver(driver);
+                localStorage.setItem('currentDriver', JSON.stringify(driver));
+            }} />;
+        }
+        
+        return <DriverApp 
+            riskTypes={riskTypes} 
+            currentDriver={currentDriver} 
+            onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }}
+            onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} 
+        />;
     }
 
+    // ==============================================================
+    // 2. MODO VISOR PÚBLICO
+    // ==============================================================
     if (publicRouteId) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
         const publicRoute = Array.isArray(routes) ? routes.find(r => r.id === publicRouteId) : null;
@@ -356,8 +351,11 @@ const App: React.FC = () => {
         return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
     }
 
+    // ==============================================================
+    // 3. MODO PANEL WEB: Acceso Asegurado
+    // ==============================================================
     if (!currentUser && !isLoadingData) {
-        return <Login users={users} onLogin={handleLogin} />;
+        return <Login users={users} onLogin={handleLogin} isDriverMode={false} />;
     }
 
     if (isLoadingData) {
@@ -417,7 +415,9 @@ const App: React.FC = () => {
                                     <div className="flex justify-between items-start mb-1 min-w-[250px]">
                                         <div>
                                             <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">{risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}</div>
+                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                                                {risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}
+                                            </div>
                                         </div>
                                         {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
                                             <div className="flex gap-1 ml-2">
@@ -432,7 +432,8 @@ const App: React.FC = () => {
                                     {risk.driverReportDetails ? (
                                         <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
                                             <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
-                                                <div className="flex items-center gap-1 text-gray-700"><Bus size={12}/> <b>Línea:</b> {risk.driverReportDetails.linea}</div>
+                                                <div className="flex items-center gap-1 text-gray-700 col-span-2 font-bold"><Bus size={12}/> Reportado por: {risk.driverReportDetails.conductorName}</div>
+                                                <div className="flex items-center gap-1 text-gray-700"><b>Línea:</b> {risk.driverReportDetails.linea}</div>
                                                 <div className="flex items-center gap-1 text-gray-700"><b>U.:</b> {risk.driverReportDetails.unidad}</div>
                                                 <div className="flex items-center gap-1 text-gray-700 col-span-2"><Navigation size={12}/> <b>Sentido:</b> {risk.driverReportDetails.sentido}</div>
                                             </div>

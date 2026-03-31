@@ -22,6 +22,7 @@ export interface DriverReportDetails {
     velocidadSugerida?: string;
     carrilRecomendado?: string;
     ubicacionManual?: string;
+    conductorName?: string; // NUEVO: Registra quién hizo el reporte
 }
 
 export interface Risk {
@@ -69,12 +70,12 @@ export interface Route {
     isPublic?: boolean;
 }
 
-// NUEVO: Modelo de Usuario
 export interface User {
     id: string;
     name: string;
-    username: string;
-    pin: string; // Contraseña simple
+    username: string; // Para el conductor este será el "Legajo"
+    pin: string;
     isAdmin: boolean;
-    allowedTabs: AppTab[]; // Permisos de acceso
+    isDriver?: boolean; // NUEVO: Determina si el usuario es un chofer
+    allowedTabs: AppTab[];
 }
