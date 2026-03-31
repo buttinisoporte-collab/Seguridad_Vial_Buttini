@@ -1,145 +1,184 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Users, PlusCircle, Trash2, Edit, Shield, Bus, MonitorSmartphone } from 'lucide-react';
-import type { User, AppTab } from '../types';
+import { MapPin, AlertTriangle, CheckCircle, Navigation, AlertOctagon, Construction, Zap, Info, LogOut, User as UserIcon } from 'lucide-react';
+import type { Risk, DriverReportDetails, RiskType, Position, User } from '../types';
 
-interface UserManagerProps {
-    users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
-    currentUser: User;
+interface DriverAppProps {
+    riskTypes: RiskType[];
+    currentDriver: User;
+    onSaveReport: (risk: Risk) => void;
+    onLogout: () => void;
 }
 
-const DISPONIBLES: { id: AppTab, label: string }[] =[
-    { id: 'routes', label: 'Recorridos' },
-    { id: 'riskTypes', label: 'Cargar Puntos' },
-    { id: 'riskViewer', label: 'Visor de Mapa' },
-    { id: 'reports', label: 'Reportes' },
-    { id: 'settings', label: 'Ajustes' }
+const CATEGORIAS_IRAM =[
+    { id: 'obstaculo', name: 'Obstáculo Físico', desc: 'Ramas, cables, escombros', icon: <AlertOctagon size={32}/>, color: '#f97316' },
+    { id: 'infraestructura', name: 'Falla Infraestructura', desc: 'Bache, hundimiento', icon: <Construction size={32}/>, color: '#ef4444' },
+    { id: 'senalizacion', name: 'Señalización/Semáforo', desc: 'Apagado, tapada', icon: <Zap size={32}/>, color: '#eab308' },
+    { id: 'desvio', name: 'Corte/Desvío', desc: 'Obra, evento, accidente', icon: <Navigation size={32}/>, color: '#8b5cf6' },
+    { id: 'riesgo', name: 'Punto de Riesgo', desc: 'Agua, baja visibilidad, animales', icon: <AlertTriangle size={32}/>, color: '#3b82f6' },
 ];
 
-export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, currentUser }) => {
-    const[editingUser, setEditingUser] = useState<User | null>(null);
-    const [name, setName] = useState('');
-    const [username, setUsername] = useState('');
-    const[pin, setPin] = useState('');
+// AQUÍ ESTÁ LA EXPORTACIÓN QUE VERCEL NO ENCONTRABA 👇
+export const DriverApp: React.FC<DriverAppProps> = ({ riskTypes, currentDriver, onSaveReport, onLogout }) => {
+    const[step, setStep] = useState<1 | 2 | 3>(1);
+    const[categoria, setCategoria] = useState<any>(null);
+    const[gpsPosition, setGpsPosition] = useState<Position | null>(null);
+    const[gpsStatus, setGpsStatus] = useState<'buscando' | 'ok' | 'error'>('buscando');
     
-    // NUEVO: Manejo de Rol
-    const[role, setRole] = useState<'admin' | 'operador' | 'conductor'>('operador');
-    const [allowedTabs, setAllowedTabs] = useState<AppTab[]>(['riskTypes', 'riskViewer']);
+    const[unidad, setUnidad] = useState(localStorage.getItem('driver_unidad') || '');
+    const[linea, setLinea] = useState(localStorage.getItem('driver_linea') || '');
+    
+    const[sentido, setSentido] = useState('Ambos');
+    const[ubicacionManual, setUbicacionManual] = useState('');
+    const [huboDesvio, setHuboDesvio] = useState(false);
+    const[rutaAlternativa, setRutaAlternativa] = useState('');
+    const[velocidadSugerida, setVelocidadSugerida] = useState('');
+    const[carrilRecomendado, setCarrilRecomendado] = useState('');
+    const[observaciones, setObservaciones] = useState('');
 
-    const handleSave = () => {
-        if (!name || !username || !pin) return alert("Complete los campos obligatorios.");
+    useEffect(() => {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => { setGpsPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGpsStatus('ok'); },
+            (err) => { console.warn("Error GPS:", err); setGpsStatus('error'); },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    },[]);
+
+    const handleSelectCategory = (cat: any) => { setCategoria(cat); setStep(2); };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        localStorage.setItem('driver_unidad', unidad); localStorage.setItem('driver_linea', linea);
+
+        const defaultRiskType = riskTypes.find(rt => rt.isIncident) || riskTypes[0];
         
-        const isAdm = role === 'admin';
-        const isDriv = role === 'conductor';
-        const finalTabs = isAdm ? DISPONIBLES.map(d => d.id) : (isDriv ?[] : allowedTabs);
+        const driverDetails: DriverReportDetails = {
+            unidad, linea, sentido, categoriaIRAM: categoria.name,
+            huboDesvio, rutaAlternativa, velocidadSugerida, carrilRecomendado, ubicacionManual,
+            conductorName: currentDriver.name
+        };
 
-        if (editingUser) {
-            setUsers(users.map(u => u.id === editingUser.id ? { ...u, name, username, pin, isAdmin: isAdm, isDriver: isDriv, allowedTabs: finalTabs } : u));
-            setEditingUser(null);
-        } else {
-            if (users.find(u => u.username.toLowerCase() === username.toLowerCase() && (u.isDriver === isDriv))) {
-                return alert(`El ${isDriv ? 'legajo' : 'nombre de usuario'} ya existe para este rol.`);
-            }
-            setUsers([...users, { id: uuidv4(), name, username, pin, isAdmin: isAdm, isDriver: isDriv, allowedTabs: finalTabs }]);
-        }
-        resetForm();
-    };
+        const newRisk: Risk = {
+            id: uuidv4(),
+            position: gpsPosition || { lat: -34.6175, lng: -68.335 },
+            riskTypeId: defaultRiskType?.id || '1',
+            description: observaciones || `Reporte IRAM 3810: ${categoria.name}`,
+            associatedRouteIds: [], images:[], driverReportDetails: driverDetails
+        };
 
-    const handleEdit = (user: User) => {
-        setEditingUser(user); setName(user.name); setUsername(user.username); setPin(user.pin); setAllowedTabs(user.allowedTabs);
-        setRole(user.isAdmin ? 'admin' : (user.isDriver ? 'conductor' : 'operador'));
-    };
-
-    const handleDelete = (id: string) => {
-        if (id === currentUser.id) return alert("No puedes eliminar tu propio usuario.");
-        if (window.confirm("¿Eliminar este usuario?")) setUsers(users.filter(u => u.id !== id));
+        onSaveReport(newRisk); setStep(3);
     };
 
     const resetForm = () => {
-        setEditingUser(null); setName(''); setUsername(''); setPin(''); setRole('operador'); setAllowedTabs(['riskTypes', 'riskViewer']);
+        setCategoria(null); setHuboDesvio(false); setRutaAlternativa(''); 
+        setVelocidadSugerida(''); setCarrilRecomendado(''); setObservaciones(''); setUbicacionManual('');
+        setStep(1);
     };
 
-    const toggleTab = (tabId: AppTab) => {
-        if (allowedTabs.includes(tabId)) setAllowedTabs(allowedTabs.filter(t => t !== tabId));
-        else setAllowedTabs([...allowedTabs, tabId]);
-    };
+    const AppHeader = () => (
+        <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
+            <div>
+                <h1 className="text-xl font-bold text-sky-400 leading-tight">Reporte Novedades</h1>
+                <p className="text-xs text-gray-400 flex items-center gap-1"><UserIcon size={12}/> {currentDriver.name}</p>
+            </div>
+            <button onClick={onLogout} className="p-2 text-red-400 bg-red-900/20 rounded-lg hover:bg-red-900/50" title="Cerrar Sesión"><LogOut size={20}/></button>
+        </div>
+    );
+
+    if (step === 1) {
+        return (
+            <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
+                <AppHeader />
+                <div className="flex-1 overflow-y-auto space-y-3 pb-6">
+                    <h2 className="text-gray-300 font-medium px-1 mb-2">Seleccione el tipo de incidencia:</h2>
+                    {CATEGORIAS_IRAM.map(cat => (
+                        <button key={cat.id} onClick={() => handleSelectCategory(cat)} className="w-full bg-gray-800 border-2 border-gray-700 hover:border-sky-500 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-95 text-left">
+                            <div className="p-3 rounded-full" style={{ backgroundColor: `${cat.color}20`, color: cat.color }}>{cat.icon}</div>
+                            <div><p className="font-bold text-lg">{cat.name}</p><p className="text-sm text-gray-400">{cat.desc}</p></div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (step === 3) {
+        return (
+            <div className="min-h-screen bg-gray-900 text-white p-6 flex flex-col items-center justify-center text-center">
+                <CheckCircle size={80} className="text-green-500 mb-6" />
+                <h1 className="text-3xl font-bold mb-2">Reporte Enviado</h1>
+                <p className="text-gray-400 mb-8">La novedad ha sido registrada en el sistema central y aparecerá en el mapa.</p>
+                <button onClick={resetForm} className="bg-sky-500 text-white font-bold text-xl py-4 px-8 rounded-xl w-full shadow-lg active:bg-sky-600 mb-4">Nuevo Reporte</button>
+                <button onClick={onLogout} className="text-gray-400 font-bold py-2 underline">Cerrar Sesión</button>
+            </div>
+        );
+    }
 
     return (
-        <div>
-            <h2 className="text-xl font-bold mb-4 text-sky-300">Gestión de Usuarios y Conductores</h2>
-            
-            {/* Formulario */}
-            <div className="bg-gray-700 p-4 rounded-lg mb-6">
-                <h3 className="font-semibold text-white mb-3">{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
-                
-                <div className="mb-4">
-                    <label className="block text-sm text-gray-400 mb-1">Perfil / Rol</label>
+        <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
+            <div className="flex justify-between items-center mb-4 bg-gray-800 p-3 rounded-xl border border-gray-700">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: categoria.color }}></div><span className="font-bold">{categoria.name}</span></div>
+                <button onClick={() => setStep(1)} className="text-sky-400 text-sm font-bold p-2">Cambiar</button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto pb-24 space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs text-gray-400 mb-1">Unidad N°</label>
+                        <input type="text" required value={unidad} onChange={e=>setUnidad(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Ej: 142" />
+                    </div>
+                    <div>
+                        <label className="block text-xs text-gray-400 mb-1">Línea/Ramal</label>
+                        <input type="text" required value={linea} onChange={e=>setLinea(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Ej: 510" />
+                    </div>
+                </div>
+
+                <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
+                    <div className="flex items-center gap-2 mb-2">
+                        <MapPin size={18} className={gpsStatus === 'ok' ? 'text-green-400' : (gpsStatus === 'buscando' ? 'text-yellow-400 animate-pulse' : 'text-red-400')} />
+                        <span className="text-sm font-medium">{gpsStatus === 'ok' ? 'GPS Capturado Exitosamente' : (gpsStatus === 'buscando' ? 'Obteniendo GPS...' : 'GPS No Disponible')}</span>
+                    </div>
+                    {gpsStatus !== 'ok' && <input type="text" value={ubicacionManual} onChange={e=>setUbicacionManual(e.target.value)} placeholder="Escriba calle/intersección manual..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none" required={gpsStatus !== 'ok'} />}
+                </div>
+
+                <div>
+                    <label className="block text-xs text-gray-400 mb-2">Sentido de Circulación</label>
                     <div className="flex gap-2">
-                        <button type="button" onClick={() => setRole('admin')} className={`flex-1 p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'admin' ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400'}`}><Shield size={16}/> Admin</button>
-                        <button type="button" onClick={() => setRole('operador')} className={`flex-1 p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'operador' ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400'}`}><MonitorSmartphone size={16}/> Operador</button>
-                        <button type="button" onClick={() => setRole('conductor')} className={`flex-1 p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'conductor' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}><Bus size={16}/> Conductor</button>
+                        {['Ascendente', 'Descendente', 'Ambos'].map(op => (
+                            <button type="button" key={op} onClick={() => setSentido(op)} className={`flex-1 py-3 rounded-lg text-sm font-bold border transition-colors ${sentido === op ? 'bg-sky-600 border-sky-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-400'}`}>{op}</button>
+                        ))}
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div className="col-span-3 sm:col-span-1">
-                        <label className="block text-[10px] uppercase text-gray-400 mb-1">Nombre Completo</label>
-                        <input type="text" value={name} onChange={e=>setName(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
+                <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 space-y-3">
+                    <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium">¿Hubo desvío?</label>
+                        <button type="button" onClick={() => setHuboDesvio(!huboDesvio)} className={`w-14 h-8 rounded-full relative transition-colors ${huboDesvio ? 'bg-green-500' : 'bg-gray-600'}`}><div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-all ${huboDesvio ? 'left-7' : 'left-1'}`}></div></button>
                     </div>
-                    <div className="col-span-3 sm:col-span-1">
-                        <label className="block text-[10px] uppercase text-gray-400 mb-1">{role === 'conductor' ? 'N° Legajo' : 'Usuario'}</label>
-                        <input type="text" value={username} onChange={e=>setUsername(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
-                    </div>
-                    <div className="col-span-3 sm:col-span-1">
-                        <label className="block text-[10px] uppercase text-gray-400 mb-1">Contraseña/PIN</label>
-                        <input type="text" value={pin} onChange={e=>setPin(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
-                    </div>
-                </div>
-
-                {role === 'operador' && (
-                    <div className="mb-4 bg-gray-800 p-3 rounded border border-gray-600">
-                        <p className="text-xs text-gray-400 mb-2 font-bold uppercase">Módulos Permitidos:</p>
-                        <div className="grid grid-cols-2 gap-2">
-                            {DISPONIBLES.map(tab => (
-                                <label key={tab.id} className="flex items-center space-x-2 cursor-pointer">
-                                    <input type="checkbox" checked={allowedTabs.includes(tab.id)} onChange={() => toggleTab(tab.id)} className="text-sky-500" />
-                                    <span className="text-sm text-gray-300">{tab.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex justify-end gap-2 mt-4">
-                    {editingUser && <button onClick={resetForm} className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm">Cancelar</button>}
-                    <button onClick={handleSave} className={`${role === 'conductor' ? 'bg-green-600 hover:bg-green-500' : 'bg-sky-500 hover:bg-sky-600'} text-white px-3 py-2 rounded text-sm font-bold flex items-center gap-1`}>
-                        <PlusCircle size={16}/> {editingUser ? 'Actualizar' : 'Crear Perfil'}
-                    </button>
-                </div>
-            </div>
-
-            {/* Lista */}
-            <div className="space-y-2">
-                {users.map(u => (
-                    <div key={u.id} className={`bg-gray-700 p-3 rounded-lg flex items-center justify-between border-l-4 ${u.isAdmin ? 'border-yellow-400' : (u.isDriver ? 'border-green-500' : 'border-sky-500')}`}>
+                    {huboDesvio && <input type="text" value={rutaAlternativa} onChange={e=>setRutaAlternativa(e.target.value)} placeholder="Ruta alternativa utilizada..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none" />}
+                    <div className="grid grid-cols-2 gap-3 pt-2">
                         <div>
-                            <p className="font-bold text-white flex items-center gap-2">
-                                {u.isAdmin && <Shield size={14} className="text-yellow-400"/>} 
-                                {u.isDriver && <Bus size={14} className="text-green-500"/>} 
-                                {!u.isAdmin && !u.isDriver && <MonitorSmartphone size={14} className="text-sky-400"/>} 
-                                {u.name}
-                            </p>
-                            <p className="text-xs text-gray-400">{u.isDriver ? 'Legajo:' : 'Usuario:'} <b>{u.username}</b> • PIN: {u.pin}</p>
-                            {!u.isAdmin && !u.isDriver && <p className="text-[10px] text-gray-500 mt-1">Permisos: {u.allowedTabs.join(', ')}</p>}
+                            <label className="block text-xs text-gray-400 mb-1">Vel. Precautoria</label>
+                            <input type="number" value={velocidadSugerida} onChange={e=>setVelocidadSugerida(e.target.value)} placeholder="Ej: 20 km/h" className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none" />
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => handleEdit(u)} className="text-yellow-400 hover:text-yellow-300"><Edit size={16}/></button>
-                            {u.id !== currentUser.id && <button onClick={() => handleDelete(u.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16}/></button>}
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Carril Recomendado</label>
+                            <select value={carrilRecomendado} onChange={e=>setCarrilRecomendado(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none text-white">
+                                <option value="">Ninguno</option><option value="Izquierdo">Izquierdo</option><option value="Central">Central</option><option value="Derecho">Derecho</option>
+                            </select>
                         </div>
                     </div>
-                ))}
-            </div>
+                </div>
+
+                <div>
+                    <label className="flex items-center gap-1 text-xs text-gray-400 mb-1"><Info size={14}/> Observaciones / Detalles</label>
+                    <textarea rows={3} value={observaciones} onChange={e=>setObservaciones(e.target.value)} placeholder="Detalle la novedad aquí..." className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500"></textarea>
+                </div>
+
+                <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800">
+                    <button type="submit" className="w-full bg-sky-500 text-white font-bold text-lg py-4 rounded-xl shadow-[0_0_15px_rgba(14,165,233,0.5)] active:bg-sky-600 flex justify-center items-center gap-2">Enviar Reporte a Base</button>
+                </div>
+            </form>
         </div>
     );
 };
