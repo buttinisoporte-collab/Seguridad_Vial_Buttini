@@ -1,4 +1,3 @@
---- START OF FILE components/SiniestrosAdmin.tsx ---
 import React, { useState } from 'react';
 import type { Siniestro } from '../types';
 import { ShieldAlert, Trash2, Folder, MapPin } from 'lucide-react';
@@ -72,4 +71,3 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({ siniestros, ha
         </div>
     );
 };
---- END OF FILE components/SiniestrosAdmin.tsx ---

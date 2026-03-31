@@ -1,15 +1,16 @@
+--- START OF FILE src/lib/firebase.ts ---
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import type { Route, Risk, RiskType, User, Siniestro } from '../types';
 
 // 👇 MANTÉN TUS CLAVES AQUÍ 👇
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TU_MESSAGING_ID",
-  appId: "TU_APP_ID"
+  apiKey: "AIzaSyBiSZHiOG4NPh7nC298DG48t2ARPbR0kWs",
+  authDomain: "riesgo-vial.firebaseapp.com",
+  projectId: "riesgo-vial",
+  storageBucket: "riesgo-vial.firebasestorage.app",
+  messagingSenderId: "204923217648",
+  appId: "1:204923217648:web:5b655f6469f5ad306e0435"
 };
 
 let db: any;
@@ -35,3 +36,4 @@ export const deleteUserFromDB = async (id: string) => { if(db) await deleteDoc(d
 export const saveSiniestroToDB = async (siniestro: Siniestro) => { if(db) await setDoc(doc(db, "siniestros", siniestro.id), siniestro); };
 export const loadSiniestrosFromDB = async (): Promise<Siniestro[]> => { if(!db) throw new Error("No DB"); return (await getDocs(collection(db, "siniestros"))).docs.map(d => d.data() as Siniestro); };
 export const deleteSiniestroFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "siniestros", id)); };
+--- END OF FILE src/lib/firebase.ts ---
