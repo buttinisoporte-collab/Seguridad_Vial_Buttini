@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Users, PlusCircle, Trash2, Edit, Shield, Bus, MonitorSmartphone } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Shield, Bus, MonitorSmartphone, Search } from 'lucide-react';
 import type { User, AppTab } from '../types';
 
 interface UserManagerProps {
@@ -12,24 +12,26 @@ interface UserManagerProps {
 const DISPONIBLES: { id: AppTab, label: string }[] =[
     { id: 'routes', label: 'Recorridos' },
     { id: 'riskTypes', label: 'Cargar Puntos' },
-    { id: 'riskViewer', label: 'Visor de Mapa' },
+    { id: 'riskViewer', label: 'Visor Mapa' },
+    { id: 'novedades', label: 'Novedades (Lista)' },
     { id: 'reports', label: 'Reportes' },
     { id: 'settings', label: 'Ajustes' }
 ];
 
 export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, currentUser }) => {
     const[editingUser, setEditingUser] = useState<User | null>(null);
-    const [name, setName] = useState('');
+    const[name, setName] = useState('');
     const [username, setUsername] = useState('');
     const[pin, setPin] = useState('');
-    
-    // NUEVO: Manejo de Rol
     const[role, setRole] = useState<'admin' | 'operador' | 'conductor'>('operador');
-    const [allowedTabs, setAllowedTabs] = useState<AppTab[]>(['riskTypes', 'riskViewer']);
+    const [allowedTabs, setAllowedTabs] = useState<AppTab[]>(['riskTypes', 'riskViewer', 'novedades']);
+
+    // Filtros
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterRole, setFilterRole] = useState<'all' | 'admin' | 'operador' | 'conductor'>('all');
 
     const handleSave = () => {
         if (!name || !username || !pin) return alert("Complete los campos obligatorios.");
-        
         const isAdm = role === 'admin';
         const isDriv = role === 'conductor';
         const finalTabs = isAdm ? DISPONIBLES.map(d => d.id) : (isDriv ?[] : allowedTabs);
@@ -47,7 +49,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
     };
 
     const handleEdit = (user: User) => {
-        setEditingUser(user); setName(user.name); setUsername(user.username); setPin(user.pin); setAllowedTabs(user.allowedTabs);
+        setEditingUser(user); setName(user.name); setUsername(user.username); setPin(user.pin); setAllowedTabs(user.allowedTabs ||[]);
         setRole(user.isAdmin ? 'admin' : (user.isDriver ? 'conductor' : 'operador'));
     };
 
@@ -57,7 +59,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
     };
 
     const resetForm = () => {
-        setEditingUser(null); setName(''); setUsername(''); setPin(''); setRole('operador'); setAllowedTabs(['riskTypes', 'riskViewer']);
+        setEditingUser(null); setName(''); setUsername(''); setPin(''); setRole('operador'); setAllowedTabs(['riskTypes', 'riskViewer', 'novedades']);
     };
 
     const toggleTab = (tabId: AppTab) => {
@@ -65,35 +67,46 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
         else setAllowedTabs([...allowedTabs, tabId]);
     };
 
+    // Filtrar lista
+    const filteredUsers = users.filter(u => {
+        if (filterRole === 'admin' && !u.isAdmin) return false;
+        if (filterRole === 'conductor' && !u.isDriver) return false;
+        if (filterRole === 'operador' && (u.isAdmin || u.isDriver)) return false;
+        if (searchTerm && !u.name.toLowerCase().includes(searchTerm.toLowerCase()) && !u.username.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        return true;
+    });
+
     return (
         <div>
-            <h2 className="text-xl font-bold mb-4 text-sky-300">Gestión de Usuarios y Conductores</h2>
+            <h2 className="text-xl font-bold mb-4 text-sky-300">Gestión de Usuarios</h2>
             
-            {/* Formulario */}
+            {/* Formulario arreglado (flex-col para no desbordar) */}
             <div className="bg-gray-700 p-4 rounded-lg mb-6">
-                <h3 className="font-semibold text-white mb-3">{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
+                <h3 className="font-semibold text-white mb-3">{editingUser ? 'Editar Perfil' : 'Nuevo Perfil'}</h3>
                 
                 <div className="mb-4">
-                    <label className="block text-sm text-gray-400 mb-1">Perfil / Rol</label>
-                    <div className="flex gap-2">
-                        <button type="button" onClick={() => setRole('admin')} className={`flex-1 p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'admin' ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400'}`}><Shield size={16}/> Admin</button>
-                        <button type="button" onClick={() => setRole('operador')} className={`flex-1 p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'operador' ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400'}`}><MonitorSmartphone size={16}/> Operador</button>
-                        <button type="button" onClick={() => setRole('conductor')} className={`flex-1 p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'conductor' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}><Bus size={16}/> Conductor</button>
+                    <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Perfil / Rol</label>
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => setRole('admin')} className={`flex-1 min-w-[100px] p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'admin' ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-600'}`}><Shield size={14}/> Admin</button>
+                        <button type="button" onClick={() => setRole('operador')} className={`flex-1 min-w-[100px] p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'operador' ? 'bg-sky-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-600'}`}><MonitorSmartphone size={14}/> Operador</button>
+                        <button type="button" onClick={() => setRole('conductor')} className={`flex-1 min-w-[100px] p-2 rounded text-sm font-bold transition-colors flex justify-center items-center gap-1 ${role === 'conductor' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-600'}`}><Bus size={14}/> Conductor</button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div className="col-span-3 sm:col-span-1">
+                <div className="flex flex-col gap-3 mb-3">
+                    <div>
                         <label className="block text-[10px] uppercase text-gray-400 mb-1">Nombre Completo</label>
                         <input type="text" value={name} onChange={e=>setName(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
                     </div>
-                    <div className="col-span-3 sm:col-span-1">
-                        <label className="block text-[10px] uppercase text-gray-400 mb-1">{role === 'conductor' ? 'N° Legajo' : 'Usuario'}</label>
-                        <input type="text" value={username} onChange={e=>setUsername(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
-                    </div>
-                    <div className="col-span-3 sm:col-span-1">
-                        <label className="block text-[10px] uppercase text-gray-400 mb-1">Contraseña/PIN</label>
-                        <input type="text" value={pin} onChange={e=>setPin(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
+                    <div className="flex gap-3">
+                        <div className="flex-1">
+                            <label className="block text-[10px] uppercase text-gray-400 mb-1">{role === 'conductor' ? 'N° Legajo' : 'Usuario'}</label>
+                            <input type="text" value={username} onChange={e=>setUsername(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-[10px] uppercase text-gray-400 mb-1">Contraseña/PIN</label>
+                            <input type="text" value={pin} onChange={e=>setPin(e.target.value)} className="w-full bg-gray-800 text-white p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
+                        </div>
                     </div>
                 </div>
 
@@ -119,9 +132,23 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
                 </div>
             </div>
 
-            {/* Lista */}
+            {/* Filtros */}
+            <div className="mb-4 space-y-2">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                    <button onClick={() => setFilterRole('all')} className={`px-3 py-1 rounded-full text-xs font-bold ${filterRole === 'all' ? 'bg-gray-200 text-gray-800' : 'bg-gray-700 text-gray-300'}`}>Todos</button>
+                    <button onClick={() => setFilterRole('admin')} className={`px-3 py-1 rounded-full text-xs font-bold ${filterRole === 'admin' ? 'bg-yellow-500 text-white' : 'bg-gray-700 text-gray-300'}`}>Admin</button>
+                    <button onClick={() => setFilterRole('operador')} className={`px-3 py-1 rounded-full text-xs font-bold ${filterRole === 'operador' ? 'bg-sky-500 text-white' : 'bg-gray-700 text-gray-300'}`}>Operadores</button>
+                    <button onClick={() => setFilterRole('conductor')} className={`px-3 py-1 rounded-full text-xs font-bold ${filterRole === 'conductor' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300'}`}>Conductores</button>
+                </div>
+                <div className="relative">
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    <input type="text" placeholder="Buscar por nombre o legajo..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} className="w-full bg-gray-700 text-white pl-9 p-2 text-sm rounded border border-gray-600 focus:border-sky-500 outline-none" />
+                </div>
+            </div>
+
+            {/* Lista Filtrada */}
             <div className="space-y-2">
-                {users.map(u => (
+                {filteredUsers.map(u => (
                     <div key={u.id} className={`bg-gray-700 p-3 rounded-lg flex items-center justify-between border-l-4 ${u.isAdmin ? 'border-yellow-400' : (u.isDriver ? 'border-green-500' : 'border-sky-500')}`}>
                         <div>
                             <p className="font-bold text-white flex items-center gap-2">
@@ -131,7 +158,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
                                 {u.name}
                             </p>
                             <p className="text-xs text-gray-400">{u.isDriver ? 'Legajo:' : 'Usuario:'} <b>{u.username}</b> • PIN: {u.pin}</p>
-                            {!u.isAdmin && !u.isDriver && <p className="text-[10px] text-gray-500 mt-1">Permisos: {u.allowedTabs.join(', ')}</p>}
+                            {!u.isAdmin && !u.isDriver && <p className="text-[10px] text-gray-500 mt-1">Permisos: {(u.allowedTabs||[]).join(', ')}</p>}
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => handleEdit(u)} className="text-yellow-400 hover:text-yellow-300"><Edit size={16}/></button>
@@ -139,6 +166,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
                         </div>
                     </div>
                 ))}
+                {filteredUsers.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No se encontraron usuarios.</p>}
             </div>
         </div>
     );

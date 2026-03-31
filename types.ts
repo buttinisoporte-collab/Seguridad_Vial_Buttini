@@ -1,4 +1,4 @@
-export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'settings' | 'users';
+export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'novedades' | 'settings' | 'users';
 
 export interface Position {
     lat: number;
@@ -22,7 +22,7 @@ export interface DriverReportDetails {
     velocidadSugerida?: string;
     carrilRecomendado?: string;
     ubicacionManual?: string;
-    conductorName?: string; // NUEVO: Registra quién hizo el reporte
+    conductorName?: string;
 }
 
 export interface Risk {
@@ -35,6 +35,7 @@ export interface Risk {
     videoUrl?: string;
     driveUrl?: string;
     driverReportDetails?: DriverReportDetails;
+    timestamp?: number; // NUEVO: Para saber cuándo caduca
 }
 
 export interface GeoJSONFeature<T> {
@@ -73,9 +74,9 @@ export interface Route {
 export interface User {
     id: string;
     name: string;
-    username: string; // Para el conductor este será el "Legajo"
+    username: string;
     pin: string;
     isAdmin: boolean;
-    isDriver?: boolean; // NUEVO: Determina si el usuario es un chofer
+    isDriver?: boolean;
     allowedTabs: AppTab[];
 }

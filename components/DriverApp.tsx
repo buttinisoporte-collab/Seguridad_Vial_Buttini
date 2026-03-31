@@ -18,7 +18,6 @@ const CATEGORIAS_IRAM =[
     { id: 'riesgo', name: 'Punto de Riesgo', desc: 'Agua, baja visibilidad, animales', icon: <AlertTriangle size={32}/>, color: '#3b82f6' },
 ];
 
-// AQUÍ ESTÁ LA EXPORTACIÓN QUE VERCEL NO ENCONTRABA 👇
 export const DriverApp: React.FC<DriverAppProps> = ({ riskTypes, currentDriver, onSaveReport, onLogout }) => {
     const[step, setStep] = useState<1 | 2 | 3>(1);
     const[categoria, setCategoria] = useState<any>(null);
@@ -50,7 +49,8 @@ export const DriverApp: React.FC<DriverAppProps> = ({ riskTypes, currentDriver, 
         e.preventDefault();
         localStorage.setItem('driver_unidad', unidad); localStorage.setItem('driver_linea', linea);
 
-        const defaultRiskType = riskTypes.find(rt => rt.isIncident) || riskTypes[0];
+        // Los conductores SIEMPRE lo cargan como riesgo (isIncident = false) según solicitaste
+        const defaultRiskType = riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
         
         const driverDetails: DriverReportDetails = {
             unidad, linea, sentido, categoriaIRAM: categoria.name,
@@ -63,7 +63,9 @@ export const DriverApp: React.FC<DriverAppProps> = ({ riskTypes, currentDriver, 
             position: gpsPosition || { lat: -34.6175, lng: -68.335 },
             riskTypeId: defaultRiskType?.id || '1',
             description: observaciones || `Reporte IRAM 3810: ${categoria.name}`,
-            associatedRouteIds: [], images:[], driverReportDetails: driverDetails
+            associatedRouteIds: [], images:[], 
+            driverReportDetails: driverDetails,
+            timestamp: Date.now() // Agregamos Timestamp para expiración
         };
 
         onSaveReport(newRisk); setStep(3);
@@ -107,7 +109,7 @@ export const DriverApp: React.FC<DriverAppProps> = ({ riskTypes, currentDriver, 
             <div className="min-h-screen bg-gray-900 text-white p-6 flex flex-col items-center justify-center text-center">
                 <CheckCircle size={80} className="text-green-500 mb-6" />
                 <h1 className="text-3xl font-bold mb-2">Reporte Enviado</h1>
-                <p className="text-gray-400 mb-8">La novedad ha sido registrada en el sistema central y aparecerá en el mapa.</p>
+                <p className="text-gray-400 mb-8">La novedad ha sido registrada en el sistema central y aparecerá en el mapa temporalmente.</p>
                 <button onClick={resetForm} className="bg-sky-500 text-white font-bold text-xl py-4 px-8 rounded-xl w-full shadow-lg active:bg-sky-600 mb-4">Nuevo Reporte</button>
                 <button onClick={onLogout} className="text-gray-400 font-bold py-2 underline">Cerrar Sesión</button>
             </div>

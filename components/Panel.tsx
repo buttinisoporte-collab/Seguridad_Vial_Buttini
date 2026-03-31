@@ -1,66 +1,57 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { RiskType, Route, Risk, AppTab, User } from '../types';
 import { RouteManager } from './RouteManager';
 import { RiskTypeManager } from './RiskTypeManager';
 import { ReportViewer } from './ReportViewer';
 import { RiskViewer } from './RiskViewer';
+import { NovedadesList } from './NovedadesList';
 import { Settings } from './Settings';
 import { UserManager } from './UserManager';
-import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut } from 'lucide-react';
+import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List } from 'lucide-react';
 
 interface PanelProps {
-    currentUser: User;
-    onLogout: () => void;
-    users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
-
+    currentUser: User; onLogout: () => void; users: User[]; setUsers: React.Dispatch<React.SetStateAction<User[]>>;
     riskTypes: RiskType[]; setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
     routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
     risks: Risk[]; setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
     proximityDistance: number; setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
+    driverReportTTL: number; setDriverReportTTL: React.Dispatch<React.SetStateAction<number>>;
     onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
     getRiskType: (id: string) => RiskType | undefined;
-    
     activeTab: AppTab; setActiveTab: React.Dispatch<React.SetStateAction<AppTab>>;
     showRisks: boolean; setShowRisks: React.Dispatch<React.SetStateAction<boolean>>;
     showIncidents: boolean; setShowIncidents: React.Dispatch<React.SetStateAction<boolean>>;
-
     filterGroup: string; setFilterGroup: React.Dispatch<React.SetStateAction<string>>;
     filterLine: string; setFilterLine: React.Dispatch<React.SetStateAction<string>>;
     filterService: string; setFilterService: React.Dispatch<React.SetStateAction<string>>;
     activeRouteId: string | null; setActiveRouteId: React.Dispatch<React.SetStateAction<string | null>>;
-    
     reportSelectedRouteId: string; setReportSelectedRouteId: React.Dispatch<React.SetStateAction<string>>;
     riskViewerSelectedTypes: string[]; setRiskViewerSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
-    
-    togglePublicRoute: (id: string) => void;
+    togglePublicRoute: (id: string) => void; handleDeleteRisk: (id: string) => void;
 }
 
 export const Panel: React.FC<PanelProps> = ({
-    currentUser, onLogout, users, setUsers,
-    riskTypes, setRiskTypes, routes, setRoutes, risks, setRisks, proximityDistance,
-    setProximityDistance, onAddRoute, getRiskType,
-    activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
-    filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, 
-    activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
-    riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute
+    currentUser, onLogout, users, setUsers, riskTypes, setRiskTypes, routes, setRoutes, risks, setRisks, proximityDistance,
+    setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
+    filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
+    riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk
 }) => {
 
     const renderTabContent = () => {
         switch (activeTab) {
-            case 'routes':
-                return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} isAdmin={currentUser.isAdmin} />;
+            case 'routes': return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} isAdmin={currentUser.isAdmin} />;
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} />;
+            case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
-            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} />;
+            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
             default: return null;
         }
     };
     
     const TabButton: React.FC<{ tabName: AppTab; icon: React.ReactNode; label: string }> = ({ tabName, icon, label }) => {
-        if (!currentUser.isAdmin && !currentUser.allowedTabs.includes(tabName) && tabName !== 'users') return null;
+        if (!currentUser.isAdmin && !(currentUser.allowedTabs||[]).includes(tabName) && tabName !== 'users') return null;
         if (tabName === 'users' && !currentUser.isAdmin) return null; 
 
         return (
@@ -71,13 +62,22 @@ export const Panel: React.FC<PanelProps> = ({
         );
     };
 
+    const handleChangePass = () => {
+        const newPin = window.prompt("Ingrese su nueva contraseña:");
+        if (newPin && newPin.trim().length > 0) {
+            setUsers(users.map(u => u.id === currentUser.id ? { ...u, pin: newPin.trim() } : u));
+            alert("Contraseña actualizada. Use la nueva clave la próxima vez que inicie sesión.");
+        }
+    };
+
     return (
-        <aside className="w-[400px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
+        <aside className="w-[420px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
                  <div className="flex items-center text-sky-400 mb-2" title={`Conectado como: ${currentUser.name}`}><Map size={32} /></div>
                 
                 <TabButton tabName="routes" icon={<MapPin size={24} />} label="Recorridos" />
                 <TabButton tabName="riskTypes" icon={<AlertTriangle size={24} />} label="Cargar" />
+                <TabButton tabName="novedades" icon={<List size={24} />} label="Novedades" />
                 <TabButton tabName="riskViewer" icon={<Layers size={24} />} label="Visor" />
                 <TabButton tabName="reports" icon={<FileBarChart size={24} />} label="Reportes" />
                 <TabButton tabName="settings" icon={<SettingsIcon size={24} />} label="Ajustes" />
@@ -85,7 +85,15 @@ export const Panel: React.FC<PanelProps> = ({
 
                 <div className="flex-1"></div>
                 
-                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-auto" title="Cerrar Sesión">
+                {/* Botón Cambiar Contraseña SOLO PARA OPERADORES */}
+                {!currentUser.isAdmin && !currentUser.isDriver && (
+                    <button onClick={handleChangePass} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña">
+                        <Key size={20} />
+                        <span className="mt-1 text-center leading-tight">Clave</span>
+                    </button>
+                )}
+
+                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión">
                     <LogOut size={24} />
                     <span className="mt-1 text-center leading-tight">Salir</span>
                 </button>

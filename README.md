@@ -1,12 +1,20 @@
-Aplicación de Riesgo Vial Empresa Buttini. 
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-Acceso por perfil con usuario y contraseña
-https://seguridad-vial-buttini.vercel.app/
+# Run and deploy your AI Studio app
 
-Conductores acceden con link especial
-https://seguridad-vial-buttini.vercel.app/?mode=driver
+This contains everything you need to run your app locally.
 
-Sugerencia de seguridad de acceso de usuarios (vincular disp con usuario)
-https://chatgpt.com/c/69cbd8fe-8118-83e9-8c07-8fb0b53b5997
+View your app in AI Studio: https://ai.studio/apps/5c2be318-b8e7-4c90-92b7-8b1bb8bf488e
+
+## Run Locally
+
+**Prerequisites:**  Node.js
 
 
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
