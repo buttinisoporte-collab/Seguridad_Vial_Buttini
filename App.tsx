@@ -28,16 +28,20 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
+// =========================================================================
+// FUNCIÓN BLINDADA CONTRA ERRORES DE TURF.JS
+// =========================================================================
 const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThreshold: number): boolean => {
-    if (!geoJson || !Array.isArray(geoJson.features) || !position || typeof position.lat !== 'number' || typeof position.lng !== 'number') return false;
+    if (!geoJson || !Array.isArray(geoJson.features)) return false;
+    
+    const riskPoint = point([position.lng, position.lat]);
+    
+    const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => 
+        f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates)
+    );
 
-    try {
-        const riskPoint = point([position.lng, position.lat]);
-        const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => 
-            f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates)
-        );
-
-        for (const feature of features) {
+    for (const feature of features) {
+        try {
             const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number');
             if (validCoords.length >= 2) {
                 const line = lineString(validCoords as [number, number][]);
@@ -45,9 +49,9 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
                     return true;
                 }
             }
+        } catch (e) {
+            console.warn("Turf omitió un segmento de ruta inválido:", e);
         }
-    } catch (e) {
-        console.warn("Se omitió el cálculo para un segmento inválido:", e);
     }
     return false;
 };
@@ -62,7 +66,9 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
                     route.geoJson.features.forEach(feature => {
                         if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
                             feature.geometry.coordinates.forEach(c => {
-                                if (Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') points.push([c[1], c[0]]);
+                                if (Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
+                                    points.push([c[1], c[0]]);
+                                }
                             });
                         }
                     });
@@ -71,9 +77,12 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
         }
         if (Array.isArray(risks)) {
             risks.forEach(risk => {
-                if (risk?.position && typeof risk.position.lat === 'number' && typeof risk.position.lng === 'number') points.push([risk.position.lat, risk.position.lng]);
+                if (risk?.position && typeof risk.position.lat === 'number' && typeof risk.position.lng === 'number') {
+                    points.push([risk.position.lat, risk.position.lng]);
+                }
             });
         }
+        
         if (points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
     },[routes, risks, map]);
@@ -81,9 +90,10 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 };
 
 const App: React.FC = () => {
-    const[isLoadingData, setIsLoadingData] = useState(true);
+    const [isLoadingData, setIsLoadingData] = useState(true);
     
-    const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    // SESIÓN ADMINISTRADOR/OPERADOR
+    const[currentUser, setCurrentUser] = useState<User | null>(() => {
         const saved = localStorage.getItem('currentUser');
         return saved ? JSON.parse(saved) : null;
     });
@@ -94,20 +104,20 @@ const App: React.FC = () => {
         return saved ? JSON.parse(saved) : null;
     });
 
-    const [activeTab, setActiveTab] = useState<AppTab>('routes');
-    const[showRisks, setShowRisks] = useState(true);
+    const[activeTab, setActiveTab] = useState<AppTab>('routes');
+    const [showRisks, setShowRisks] = useState(true);
     const[showIncidents, setShowIncidents] = useState(true);
-    const [filterGroup, setFilterGroup] = useState('');
+    const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
     const [filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
-    const [reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
-    const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
+    const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
 
-    const [users, setUsers] = useState<User[]>([]);
-    const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
-    const [routes, setRoutes] = useState<Route[]>([]);
-    const [risks, setRisks] = useState<Risk[]>([]);
+    const[users, setUsers] = useState<User[]>([]);
+    const [riskTypes, setRiskTypes] = useState<RiskType[]>([]);
+    const[routes, setRoutes] = useState<Route[]>([]);
+    const[risks, setRisks] = useState<Risk[]>([]);
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const [isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
@@ -130,11 +140,16 @@ const App: React.FC = () => {
                     loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB()
                 ]);
 
-                setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
-                setRisks(Array.isArray(dbRisks) ? dbRisks :[]); prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
+                setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); 
+                prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
+                
+                setRisks(Array.isArray(dbRisks) ? dbRisks :[]); 
+                prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
 
-                if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; } 
-                else {
+                if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { 
+                    setRiskTypes(dbRiskTypes); 
+                    prevRiskTypesRef.current = dbRiskTypes; 
+                } else {
                     const defaultTypes: RiskType[] =[
                         { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false },
                         { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false },
@@ -145,16 +160,22 @@ const App: React.FC = () => {
                     setRiskTypes(defaultTypes); defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{})); prevRiskTypesRef.current = defaultTypes;
                 }
 
-                if (Array.isArray(dbUsers) && dbUsers.length > 0) { setUsers(dbUsers); prevUsersRef.current = dbUsers; } 
-                else {
+                if (Array.isArray(dbUsers) && dbUsers.length > 0) { 
+                    setUsers(dbUsers); prevUsersRef.current = dbUsers; 
+                } else {
                     const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users'] };
                     setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
             } catch (err) {
                 console.warn("Usando Modo Local.", err);
-                const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]'); setRoutes(Array.isArray(localRoutes) ? localRoutes :[]);
-                const localRisks = JSON.parse(localStorage.getItem('risks') || '[]'); setRisks(Array.isArray(localRisks) ? localRisks :[]);
-                const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]'); if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
+                const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]');
+                setRoutes(Array.isArray(localRoutes) ? localRoutes :[]);
+                
+                const localRisks = JSON.parse(localStorage.getItem('risks') || '[]');
+                setRisks(Array.isArray(localRisks) ? localRisks :[]);
+                
+                const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]');
+                if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
                 
                 const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
                 if(Array.isArray(localUsers) && localUsers.length > 0) setUsers(localUsers);
@@ -169,7 +190,7 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronizaciones DB y LocalStorage...
+    // Sincronizaciones DB y LocalStorage
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
@@ -259,7 +280,8 @@ const App: React.FC = () => {
     const handleMapClick = useCallback((latlng: LatLng) => {
         const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) {
-            setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true);
+            setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng });
+            setIsAddRiskModalOpen(true);
         }
     }, [activeTab, currentUser]);
 
@@ -347,7 +369,7 @@ const App: React.FC = () => {
     if (publicRouteId) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
         const publicRoute = Array.isArray(routes) ? routes.find(r => r.id === publicRouteId) : null;
-        if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []).includes(publicRouteId)) :[]} riskTypes={riskTypes} />;
+        if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(publicRouteId)) :[]} riskTypes={riskTypes} />;
         return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
     }
 
