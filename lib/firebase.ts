@@ -1,4 +1,3 @@
---- START OF FILE src/lib/firebase.ts ---
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import type { Route, Risk, RiskType, User, Siniestro } from '../types';
@@ -36,4 +35,3 @@ export const deleteUserFromDB = async (id: string) => { if(db) await deleteDoc(d
 export const saveSiniestroToDB = async (siniestro: Siniestro) => { if(db) await setDoc(doc(db, "siniestros", siniestro.id), siniestro); };
 export const loadSiniestrosFromDB = async (): Promise<Siniestro[]> => { if(!db) throw new Error("No DB"); return (await getDocs(collection(db, "siniestros"))).docs.map(d => d.data() as Siniestro); };
 export const deleteSiniestroFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "siniestros", id)); };
---- END OF FILE src/lib/firebase.ts ---
