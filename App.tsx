@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, Tooltip } from 'react-leaflet';
 import L, { LatLngExpression, LatLng, Icon } from 'leaflet';
-import { pointToLineDistance, point, lineString } from '@turf/turf';
+
+// NUEVO: Importamos simplify y truncate de Turf para compresión extrema
+import { pointToLineDistance, point, lineString, simplify, truncate } from '@turf/turf';
+
 import { kml } from '@tmcw/togeojson';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -49,7 +52,7 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
         const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates));
         for (const feature of features) {
             const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number');
-            if (Array.isArray(validCoords) && validCoords.length >= 2) {
+            if (validCoords.length >= 2) {
                 const line = lineString(validCoords as[number, number][]);
                 if (pointToLineDistance(riskPoint, line, { units: 'meters' }) <= distanceThreshold) return true;
             }
@@ -73,7 +76,7 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
 const App: React.FC = () => {
     const [isLoadingData, setIsLoadingData] = useState(true);
     
-    const [currentUser, setCurrentUser] = useState<User | null>(() => { const s = localStorage.getItem('currentUser'); return s ? JSON.parse(s) : null; });
+    const[currentUser, setCurrentUser] = useState<User | null>(() => { const s = localStorage.getItem('currentUser'); return s ? JSON.parse(s) : null; });
     const[currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
 
     const[activeTab, setActiveTab] = useState<AppTab>('routes');
@@ -86,7 +89,7 @@ const App: React.FC = () => {
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
     
-    const [focusPosition, setFocusPosition] = useState<Position | null>(null);
+    const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
     const [users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
@@ -95,11 +98,11 @@ const App: React.FC = () => {
     const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const [driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
+    const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
-    const [newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
+    const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
     const prevRisksRef = useRef<Risk[]>([]);
@@ -135,7 +138,7 @@ const App: React.FC = () => {
 
                 if (Array.isArray(dbUsers) && dbUsers.length > 0) { setUsers(dbUsers); prevUsersRef.current = dbUsers; } 
                 else {
-                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros'] };
+                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros'] };
                     setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
 
@@ -146,7 +149,7 @@ const App: React.FC = () => {
                 }
 
             } catch (err) {
-                console.warn("Usando Modo Local.");
+                console.warn("Usando Modo Local.", err);
                 setRoutes(Array.isArray(JSON.parse(localStorage.getItem('routes') || '[]')) ? JSON.parse(localStorage.getItem('routes') || '[]') :[]);
                 setRisks(Array.isArray(JSON.parse(localStorage.getItem('risks') || '[]')) ? JSON.parse(localStorage.getItem('risks') || '[]') :[]);
                 setSiniestros(Array.isArray(JSON.parse(localStorage.getItem('siniestros') || '[]')) ? JSON.parse(localStorage.getItem('siniestros') || '[]') :[]);
@@ -159,7 +162,7 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronizaciones DB y LocalStorage...
+    // Sincronizaciones DB y LocalStorage
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
@@ -167,10 +170,12 @@ const App: React.FC = () => {
         const deleted = prev.filter(p => !routes.find(c => c.id === p.id));
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
         deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
-        added.forEach(c => saveRouteToDB(c).catch((e) => {
-            console.error(e);
-            alert(`No se pudo subir a Firebase la ruta ${c.name} porque es demasiado pesada.`);
-        }));
+        added.forEach(c => {
+            saveRouteToDB(c).catch((e) => {
+                console.error("Error al subir a Firebase:", e);
+                alert(`ADVERTENCIA: La ruta "${c.name}" no se pudo guardar en la nube (quizás sigue siendo muy pesada). Intente con un KML más pequeño.`);
+            });
+        });
         prevRoutesRef.current = routes;
     },[routes, isLoadingData]);
 
@@ -178,8 +183,9 @@ const App: React.FC = () => {
         if (isLoadingData) return;
         localStorage.setItem('risks', JSON.stringify(risks));
         const prev = prevRisksRef.current;
+        const deleted = prev.filter(p => !risks.find(c => c.id === p.id));
         const added = risks.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        prev.filter(p => !risks.find(c => c.id === p.id)).forEach(d => deleteRiskFromDB(d.id).catch(()=>{}));
+        deleted.forEach(d => deleteRiskFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveRiskToDB(c).catch(()=>{}));
         prevRisksRef.current = risks;
     },[risks, isLoadingData]);
@@ -188,8 +194,9 @@ const App: React.FC = () => {
         if (isLoadingData) return;
         localStorage.setItem('siniestros', JSON.stringify(siniestros));
         const prev = prevSiniestrosRef.current;
+        const deleted = prev.filter(p => !siniestros.find(c => c.id === p.id));
         const added = siniestros.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        prev.filter(p => !siniestros.find(c => c.id === p.id)).forEach(d => deleteSiniestroFromDB(d.id).catch(()=>{}));
+        deleted.forEach(d => deleteSiniestroFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveSiniestroToDB(c).catch(()=>{}));
         prevSiniestrosRef.current = siniestros;
     },[siniestros, isLoadingData]);
@@ -198,8 +205,9 @@ const App: React.FC = () => {
         if (isLoadingData) return;
         localStorage.setItem('riskTypes', JSON.stringify(riskTypes));
         const prev = prevRiskTypesRef.current;
+        const deleted = prev.filter(p => !riskTypes.find(c => c.id === p.id));
         const added = riskTypes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        prev.filter(p => !riskTypes.find(c => c.id === p.id)).forEach(d => deleteRiskTypeFromDB(d.id).catch(()=>{}));
+        deleted.forEach(d => deleteRiskTypeFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveRiskTypeToDB(c).catch(()=>{}));
         prevRiskTypesRef.current = riskTypes;
     },[riskTypes, isLoadingData]);
@@ -208,8 +216,9 @@ const App: React.FC = () => {
         if (isLoadingData) return;
         localStorage.setItem('users', JSON.stringify(users));
         const prev = prevUsersRef.current;
+        const deleted = prev.filter(p => !users.find(c => c.id === p.id));
         const added = users.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        prev.filter(p => !users.find(c => c.id === p.id)).forEach(d => deleteUserFromDB(d.id).catch(()=>{}));
+        deleted.forEach(d => deleteUserFromDB(d.id).catch(()=>{}));
         added.forEach(c => saveUserToDB(c).catch(()=>{}));
         prevUsersRef.current = users;
         
@@ -218,6 +227,7 @@ const App: React.FC = () => {
             if (updatedMe && JSON.stringify(updatedMe) !== JSON.stringify(currentUser)) { setCurrentUser(updatedMe); localStorage.setItem('currentUser', JSON.stringify(updatedMe)); }
             else if (!updatedMe) { setCurrentUser(null); localStorage.removeItem('currentUser'); }
         }
+
         if (currentDriver) {
             const updatedDriver = users.find(u => u.id === currentDriver.id);
             if (updatedDriver && JSON.stringify(updatedDriver) !== JSON.stringify(currentDriver)) { setCurrentDriver(updatedDriver); localStorage.setItem('currentDriver', JSON.stringify(updatedDriver)); }
@@ -261,54 +271,55 @@ const App: React.FC = () => {
     },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
 
     const handleDeleteRisk = useCallback((id: string) => { 
-        if (!currentUser?.isAdmin) return alert("No tienes permisos.");
+        if (!currentUser?.isAdmin) return alert("No tienes permisos para eliminar.");
         if (window.confirm("¿Está seguro que desea eliminar este reporte?")) setRisks(prev => prev.filter(r => r.id !== id)); 
     },[currentUser]);
    
-    // IMPORTANTE: COMPRESOR KML AGRESIVO PARA FIREBASE
+    // ==============================================================
+    // COMPRESIÓN AGRESIVA DE KML PARA CUMPLIR CON FIREBASE
+    // ==============================================================
     const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const rawGeoJson = kml(new DOMParser().parseFromString(event.target?.result as string, 'application/xml')) as any;
                 
-                const geoJson = {
-                    ...rawGeoJson,
-                    features: Array.isArray(rawGeoJson.features) ? rawGeoJson.features.map((f: any) => {
-                        if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) {
-                            // 1. LIMITAR CANTIDAD DE PUNTOS (Evita que Firebase explote por peso)
-                            let coords = f.geometry.coordinates;
-                            if (coords.length > 300) {
-                                // Si tiene más de 300 puntos, calculamos un salto para quedarnos solo con 300 distribuidos
-                                const step = Math.ceil(coords.length / 300);
-                                coords = coords.filter((_: any, index: number) => index % step === 0);
-                            }
+                // 1. Filtrar solo Líneas (elimina puntos de interés, marcadores e íconos del KML)
+                const lineFeatures = Array.isArray(rawGeoJson.features) ? rawGeoJson.features.filter((f: any) =>
+                    f?.geometry?.type === 'LineString' || f?.geometry?.type === 'MultiLineString'
+                ) :[];
 
-                            return {
-                                ...f,
-                                properties: { name: f.properties?.name }, // Borramos propiedades basura
-                                geometry: {
-                                    ...f.geometry,
-                                    // 2. REDONDEAR DECIMALES
-                                    coordinates: coords.map((c: any) =>[ Number(Number(c[0]).toFixed(5)), Number(Number(c[1]).toFixed(5)) ])
-                                }
-                            };
-                        }
-                        return f;
-                    }) :[]
-                };
+                // 2. Eliminar toda la "basura" de las propiedades (Google Earth guarda HTML pesadísimo ahí)
+                const cleanFeatures = lineFeatures.map((f: any) => ({
+                    type: 'Feature',
+                    properties: { name }, // Solo guardamos el nombre para no cargar peso extra
+                    geometry: f.geometry
+                }));
 
-                const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
-                setRoutes(prev =>[...prev, newRoute]);
-                setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, geoJson, proximityDistance) ? { ...risk, associatedRouteIds:[...new Set([...(Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []), newRoute.id])] } : risk));
-            } catch (error) { alert("Error al procesar el archivo KML."); }
+                const cleanGeoJson = { type: 'FeatureCollection', features: cleanFeatures };
+
+                // 3. Simplificación Matemática (Douglas-Peucker) con Turf.js
+                // tolerance: 0.0001 reduce los puntos manteniendo perfectamente la forma de las curvas en el mapa
+                const simplifiedGeoJson = simplify(cleanGeoJson as any, { tolerance: 0.0001, highQuality: false });
+
+                // 4. Truncar decimales (5 decimales = precisión de 1 metro en la vida real)
+                const finalGeoJson = truncate(simplifiedGeoJson, { precision: 5, coordinates: 2 });
+
+                const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson: finalGeoJson as any, isPublic: false };
+
+                setRoutes(prev => [...prev, newRoute]);
+                setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, finalGeoJson as any, proximityDistance) ? { ...risk, associatedRouteIds: [...new Set([...(Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []), newRoute.id])] } : risk));
+
+            } catch (error) {
+                console.error(error);
+                alert("Error al procesar el archivo KML. Verifique que sea un formato válido.");
+            }
         };
         reader.readAsText(kmlFile);
     }, [proximityDistance]);
-       
+   
     const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
 
-    // MAP FILTER TTL
     const baseVisibleRisks = useMemo(() => Array.isArray(risks) ? risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
         if (!rt) return false;
@@ -341,20 +352,25 @@ const App: React.FC = () => {
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
-    if (isSiniestroMode) return <SiniestroForm onSaveSiniestro={async (sin) => { setSiniestros(prev => [...prev, sin]); await saveSiniestroToDB(sin); }} />;
+    if (isSiniestroMode) {
+        return <SiniestroForm onSaveSiniestro={async (sin) => { setSiniestros(prev => [...prev, sin]); await saveSiniestroToDB(sin); }} />;
+    }
+
     if (isDriverMode) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
         if (!currentDriver) return <Login users={users} isDriverMode={true} onLogin={(d) => { setCurrentDriver(d); localStorage.setItem('currentDriver', JSON.stringify(d)); }} />;
         return <DriverApp routes={routes} currentDriver={currentDriver} onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
     }
+
     if (publicRouteId) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
         const publicRoute = Array.isArray(routes) ? routes.find(r => r.id === publicRouteId) : null;
         if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(publicRouteId)) :[]} riskTypes={riskTypes} />;
-        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1></div>;
+        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
     }
+
     if (!currentUser && !isLoadingData) return <Login users={users} onLogin={handleLogin} isDriverMode={false} />;
-    if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando...</h1></div>;
+    if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1></div>;
 
     return (
         <div className="flex h-screen w-screen bg-gray-100 font-sans">
@@ -384,11 +400,11 @@ const App: React.FC = () => {
                             route.geoJson.features.forEach(feature => { 
                                 if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
                                     const validSegment = feature.geometry.coordinates.filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number').map((c: any) => [c[1], c[0]] as LatLngExpression);
-                                    if (Array.isArray(validSegment) && validSegment.length > 0) path.push(validSegment);
+                                    if (validSegment.length > 0) path.push(validSegment);
                                 }
                             });
                         }
-                        if (!Array.isArray(path) || path.length === 0) return null;
+                        if (path.length === 0) return null;
                         const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer') ? 1 : 0.4;
                         return <Polyline key={route.id} positions={path} color="#0284c7" weight={5} opacity={opacity} />;
                     })}
@@ -407,7 +423,9 @@ const App: React.FC = () => {
                                     <div className="flex justify-between items-start mb-1 min-w-[250px]">
                                         <div>
                                             <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">{risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}</div>
+                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                                                {risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}
+                                            </div>
                                         </div>
                                         {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
                                             <div className="flex gap-1 ml-2">
@@ -416,6 +434,7 @@ const App: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
+                                    
                                     {risk.driverReportDetails ? (
                                         <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
                                             <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
@@ -427,15 +446,21 @@ const App: React.FC = () => {
                                             <div className="text-xs space-y-1 mb-2">
                                                 {risk.driverReportDetails.ubicacionManual && <p><b>Ubicación Manual:</b> {risk.driverReportDetails.ubicacionManual}</p>}
                                                 <p className="flex items-center gap-1 text-red-600 font-bold"><ShieldAlert size={12}/> {risk.driverReportDetails.huboDesvio ? 'Desvío Activado' : 'Sin Desvío'}</p>
+                                                {risk.driverReportDetails.rutaAlternativa && <p className="text-gray-600 ml-4">Ruta: {risk.driverReportDetails.rutaAlternativa}</p>}
+                                                {risk.driverReportDetails.velocidadSugerida && <p className="text-yellow-600 font-medium">Velocidad Precautoria: {risk.driverReportDetails.velocidadSugerida} km/h</p>}
+                                                {risk.driverReportDetails.carrilRecomendado && <p className="text-sky-600 font-medium">Carril: {risk.driverReportDetails.carrilRecomendado}</p>}
                                             </div>
+                                            {risk.description && <div className="bg-white p-2 rounded text-xs text-gray-700 italic border border-gray-200">"{risk.description}"</div>}
                                         </div>
                                     ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
                                    
                                     <div className="flex gap-2 items-center mb-2">
                                         {Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
+                                        {risk.videoUrl && <a href={risk.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-sky-500"><Video size={20} /></a>}
+                                        {risk.driveUrl && <a href={risk.driveUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-green-500"><Folder size={20} /></a>}
                                     </div>
 
-                                    {Array.isArray(associatedRoutes) && associatedRoutes.length > 0 && (
+                                    {associatedRoutes.length > 0 && (
                                         <div className="mt-2 pt-2 border-t">
                                             <h4 className="font-semibold text-sm text-gray-800">Recorridos Afectados:</h4>
                                             <ul className="list-disc list-inside text-xs text-gray-600 max-h-24 overflow-y-auto">{associatedRoutes.map(r => <li key={r.id}>{r.name}</li>)}</ul>
