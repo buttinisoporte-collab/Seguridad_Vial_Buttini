@@ -164,11 +164,15 @@ const App: React.FC = () => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
         const prev = prevRoutesRef.current;
+        const deleted = prev.filter(p => !routes.find(c => c.id === p.id));
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
-        prev.filter(p => !routes.find(c => c.id === p.id)).forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
-        added.forEach(c => saveRouteToDB(c).catch(e => console.error("Error guardando ruta:", e)));
+        deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
+        added.forEach(c => saveRouteToDB(c).catch((e) => {
+            console.error(e);
+            alert(`No se pudo subir a Firebase la ruta ${c.name} porque es demasiado pesada.`);
+        }));
         prevRoutesRef.current = routes;
-    }, [routes, isLoadingData]);
+    },[routes, isLoadingData]);
 
     useEffect(() => {
         if (isLoadingData) return;
@@ -261,7 +265,6 @@ const App: React.FC = () => {
         if (window.confirm("¿Está seguro que desea eliminar este reporte?")) setRisks(prev => prev.filter(r => r.id !== id)); 
     },[currentUser]);
    
-    // IMPORTANTE: COMPRESOR KML ACTIVO AQUÍ PARA EVITAR EL LIMITE DE 1MB DE FIREBASE
     // IMPORTANTE: COMPRESOR KML AGRESIVO PARA FIREBASE
     const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
