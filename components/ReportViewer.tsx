@@ -13,29 +13,33 @@ interface ReportViewerProps {
 
 export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRiskType, selectedRouteId, setSelectedRouteId }) => {
 
-    const selectedRoute = useMemo(() => routes.find(r => r.id === selectedRouteId), [selectedRouteId, routes]);
+    const selectedRoute = useMemo(() => Array.isArray(routes) ? routes.find(r => r.id === selectedRouteId) : null, [selectedRouteId, routes]);
 
     const sortedSelectedRouteRisks = useMemo(() => {
-        if (!selectedRouteId || !selectedRoute) return[];
-        const unsortedRisks = risks.filter(risk => risk.associatedRouteIds.includes(selectedRouteId));
+        if (!selectedRouteId || !selectedRoute || !Array.isArray(risks)) return[];
+        const unsortedRisks = risks.filter(risk => Array.isArray(risk.associatedRouteIds) && risk.associatedRouteIds.includes(selectedRouteId));
 
         let referenceLine: GeoJSON.Feature<GeoJSON.LineString> | null = null;
-        if (selectedRoute.geoJson) {
-            const lineFeature = selectedRoute.geoJson.features.find(f => f.geometry.type === 'LineString');
+        if (selectedRoute.geoJson && Array.isArray(selectedRoute.geoJson.features)) {
+            const lineFeature = selectedRoute.geoJson.features.find(f => f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates) && f.geometry.coordinates.length >= 2);
             if (lineFeature) referenceLine = lineFeature as GeoJSON.Feature<GeoJSON.LineString>;
         }
 
         if (!referenceLine) return unsortedRisks;
 
-        // Ordenar calculando la distancia del punto a lo largo de la ruta (desde el origen)
-        return [...unsortedRisks].sort((a, b) => {
-            const ptA = point([a.position.lng, a.position.lat]);
-            const ptB = point([b.position.lng, b.position.lat]);
-            const snappedA = nearestPointOnLine(referenceLine!, ptA);
-            const snappedB = nearestPointOnLine(referenceLine!, ptB);
-            const distA = snappedA.properties?.location || 0;
-            const distB = snappedB.properties?.location || 0;
-            return distA - distB;
+        return[...unsortedRisks].sort((a, b) => {
+            try {
+                if(!a.position || !b.position) return 0;
+                const ptA = point([a.position.lng, a.position.lat]);
+                const ptB = point([b.position.lng, b.position.lat]);
+                const snappedA = nearestPointOnLine(referenceLine!, ptA);
+                const snappedB = nearestPointOnLine(referenceLine!, ptB);
+                const distA = snappedA.properties?.location || 0;
+                const distB = snappedB.properties?.location || 0;
+                return distA - distB;
+            } catch (e) {
+                return 0; // Mantiene el orden original si falla
+            }
         });
     },[selectedRouteId, risks, selectedRoute]);
 
@@ -45,7 +49,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRi
             <div className="mb-4">
                 <select value={selectedRouteId} onChange={(e) => setSelectedRouteId(e.target.value)} className="w-full bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:ring-sky-500 focus:border-sky-500">
                     <option value="">-- Elija un recorrido --</option>
-                    {routes.map(route => <option key={route.id} value={route.id}>{route.name}</option>)}
+                    {Array.isArray(routes) && routes.map(route => <option key={route.id} value={route.id}>{route.name}</option>)}
                 </select>
             </div>
 

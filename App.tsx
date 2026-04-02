@@ -30,9 +30,6 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
-// =========================================================
-// COMPONENTES MAPA INTERNOS
-// =========================================================
 const MapFixer = () => {
     const map = useMap();
     useEffect(() => { const timer = setTimeout(() => map.invalidateSize(), 300); return () => clearTimeout(timer); }, [map]);
@@ -52,12 +49,12 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
         const features = geoJson.features.filter((f): f is GeoJSONFeature<GeoJSONLineString> => f?.geometry?.type === 'LineString' && Array.isArray(f.geometry?.coordinates));
         for (const feature of features) {
             const validCoords = feature.geometry.coordinates.filter(c => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number');
-            if (validCoords.length >= 2) {
+            if (Array.isArray(validCoords) && validCoords.length >= 2) {
                 const line = lineString(validCoords as[number, number][]);
                 if (pointToLineDistance(riskPoint, line, { units: 'meters' }) <= distanceThreshold) return true;
             }
         }
-    } catch (e) { console.warn("Se omitió cálculo inválido"); }
+    } catch (e) { console.warn("Cálculo omitido por geometría inválida."); }
     return false;
 };
 
@@ -65,37 +62,34 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes
     const map = useMap();
     useEffect(() => {
         const points: LatLngExpression[] =[];
-        if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString') f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
+        if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features && Array.isArray(r.geoJson.features)) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
         if (Array.isArray(risks)) risks.forEach(r => { if (r?.position?.lat && r?.position?.lng) points.push([r.position.lat, r.position.lng]); });
-        if (points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
+        if (Array.isArray(points) && points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
     },[routes, risks, map]);
     return null;
 };
 
-
 const App: React.FC = () => {
     const [isLoadingData, setIsLoadingData] = useState(true);
     
     const [currentUser, setCurrentUser] = useState<User | null>(() => { const s = localStorage.getItem('currentUser'); return s ? JSON.parse(s) : null; });
-    const [currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
+    const[currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
 
-    const [activeTab, setActiveTab] = useState<AppTab>('routes');
+    const[activeTab, setActiveTab] = useState<AppTab>('routes');
     const [showRisks, setShowRisks] = useState(true);
     const[showIncidents, setShowIncidents] = useState(true);
-    const [filterGroup, setFilterGroup] = useState('');
+    const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
     const [filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
-    const [riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
     
-    // MAP STATES
     const [focusPosition, setFocusPosition] = useState<Position | null>(null);
 
-    // DATA STATES
     const [users, setUsers] = useState<User[]>([]);
-    const [riskTypes, setRiskTypes] = useState<RiskType[]>([]);
+    const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
     const [risks, setRisks] = useState<Risk[]>([]);
     const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
@@ -122,16 +116,13 @@ const App: React.FC = () => {
         const initData = async () => {
             setIsLoadingData(true);
             try {
-                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers, dbSiniestros] = await Promise.all([ 
-                    loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB(), loadSiniestrosFromDB() 
-                ]);
+                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers, dbSiniestros] = await Promise.all([ loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB(), loadSiniestrosFromDB() ]);
                 
                 setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
                 setRisks(Array.isArray(dbRisks) ? dbRisks :[]); prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
                 setSiniestros(Array.isArray(dbSiniestros) ? dbSiniestros :[]); prevSiniestrosRef.current = Array.isArray(dbSiniestros) ? dbSiniestros :[];
 
                 if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { 
-                    // Aseguramos que siempre exista el tipo negro para incidentes
                     if (!dbRiskTypes.find(rt => rt.id === 'incidente-ruta')) {
                         const incType = { id: 'incidente-ruta', name: 'Incidente en Ruta', color: '#000000', isIncident: true };
                         dbRiskTypes.push(incType); saveRiskTypeToDB(incType).catch(()=>{});
@@ -144,20 +135,18 @@ const App: React.FC = () => {
 
                 if (Array.isArray(dbUsers) && dbUsers.length > 0) { setUsers(dbUsers); prevUsersRef.current = dbUsers; } 
                 else {
-                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros'] };
+                    const defaultAdmin: User = { id: uuidv4(), name: 'Administrador', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros'] };
                     setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
 
-                // SUBIR SINIESTROS OFFLINE SI LOS HAY
                 const offlineSiniestros = JSON.parse(localStorage.getItem('offline_siniestros') || '[]');
-                if (offlineSiniestros.length > 0 && navigator.onLine) {
+                if (Array.isArray(offlineSiniestros) && offlineSiniestros.length > 0 && navigator.onLine) {
                     for (const os of offlineSiniestros) { await saveSiniestroToDB(os).catch(()=>{}); }
                     localStorage.removeItem('offline_siniestros');
                 }
 
             } catch (err) {
                 console.warn("Usando Modo Local.");
-                // Mocking para Fallback Local...
                 setRoutes(Array.isArray(JSON.parse(localStorage.getItem('routes') || '[]')) ? JSON.parse(localStorage.getItem('routes') || '[]') :[]);
                 setRisks(Array.isArray(JSON.parse(localStorage.getItem('risks') || '[]')) ? JSON.parse(localStorage.getItem('risks') || '[]') :[]);
                 setSiniestros(Array.isArray(JSON.parse(localStorage.getItem('siniestros') || '[]')) ? JSON.parse(localStorage.getItem('siniestros') || '[]') :[]);
@@ -170,14 +159,14 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronizaciones Automáticas
+    // Sincronizaciones DB y LocalStorage...
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
         const prev = prevRoutesRef.current;
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
         prev.filter(p => !routes.find(c => c.id === p.id)).forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
-        added.forEach(c => saveRouteToDB(c).catch(()=>{}));
+        added.forEach(c => saveRouteToDB(c).catch(e => console.error("Error guardando ruta:", e)));
         prevRoutesRef.current = routes;
     }, [routes, isLoadingData]);
 
@@ -268,15 +257,35 @@ const App: React.FC = () => {
     },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
 
     const handleDeleteRisk = useCallback((id: string) => { 
-        if (!currentUser?.isAdmin) return alert("No tienes permisos para eliminar.");
+        if (!currentUser?.isAdmin) return alert("No tienes permisos.");
         if (window.confirm("¿Está seguro que desea eliminar este reporte?")) setRisks(prev => prev.filter(r => r.id !== id)); 
     },[currentUser]);
    
+    // IMPORTANTE: COMPRESOR KML ACTIVO AQUÍ PARA EVITAR EL LIMITE DE 1MB DE FIREBASE
     const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
-                const geoJson = kml(new DOMParser().parseFromString(event.target?.result as string, 'application/xml')) as any;
+                const rawGeoJson = kml(new DOMParser().parseFromString(event.target?.result as string, 'application/xml')) as any;
+                
+                // COMPRESIÓN DE DATOS (Evita que Firebase rebote el archivo por ser muy pesado)
+                const geoJson = {
+                    ...rawGeoJson,
+                    features: Array.isArray(rawGeoJson.features) ? rawGeoJson.features.map((f: any) => {
+                        if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) {
+                            return {
+                                ...f,
+                                properties: { name: f.properties?.name }, // Borra propiedades extra basura de Google Earth
+                                geometry: {
+                                    ...f.geometry,
+                                    coordinates: f.geometry.coordinates.map((c: any) => [ Number(Number(c[0]).toFixed(5)), Number(Number(c[1]).toFixed(5)) ])
+                                }
+                            };
+                        }
+                        return f;
+                    }) :[]
+                };
+
                 const newRoute: Route = { id: uuidv4(), name, origin, destination, group, line, service, geoJson, isPublic: false };
                 setRoutes(prev =>[...prev, newRoute]);
                 setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, geoJson, proximityDistance) ? { ...risk, associatedRouteIds:[...new Set([...(Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []), newRoute.id])] } : risk));
@@ -320,31 +329,20 @@ const App: React.FC = () => {
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
-    // ==============================================================
-    // URL ROUTES CONDICIONALES
-    // ==============================================================
-    if (isSiniestroMode) {
-        return <SiniestroForm onSaveSiniestro={async (sin) => {
-            setSiniestros(prev => [...prev, sin]);
-            await saveSiniestroToDB(sin);
-        }} />;
-    }
-
+    if (isSiniestroMode) return <SiniestroForm onSaveSiniestro={async (sin) => { setSiniestros(prev => [...prev, sin]); await saveSiniestroToDB(sin); }} />;
     if (isDriverMode) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
         if (!currentDriver) return <Login users={users} isDriverMode={true} onLogin={(d) => { setCurrentDriver(d); localStorage.setItem('currentDriver', JSON.stringify(d)); }} />;
         return <DriverApp routes={routes} currentDriver={currentDriver} onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
     }
-
     if (publicRouteId) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
         const publicRoute = Array.isArray(routes) ? routes.find(r => r.id === publicRouteId) : null;
         if (publicRoute && publicRoute.isPublic) return <PublicRouteViewer route={publicRoute} risks={Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(publicRouteId)) :[]} riskTypes={riskTypes} />;
-        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
+        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1></div>;
     }
-
     if (!currentUser && !isLoadingData) return <Login users={users} onLogin={handleLogin} isDriverMode={false} />;
-    if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1></div>;
+    if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando...</h1></div>;
 
     return (
         <div className="flex h-screen w-screen bg-gray-100 font-sans">
@@ -374,11 +372,11 @@ const App: React.FC = () => {
                             route.geoJson.features.forEach(feature => { 
                                 if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
                                     const validSegment = feature.geometry.coordinates.filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number').map((c: any) => [c[1], c[0]] as LatLngExpression);
-                                    if (validSegment.length > 0) path.push(validSegment);
+                                    if (Array.isArray(validSegment) && validSegment.length > 0) path.push(validSegment);
                                 }
                             });
                         }
-                        if (path.length === 0) return null;
+                        if (!Array.isArray(path) || path.length === 0) return null;
                         const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer') ? 1 : 0.4;
                         return <Polyline key={route.id} positions={path} color="#0284c7" weight={5} opacity={opacity} />;
                     })}
@@ -397,9 +395,7 @@ const App: React.FC = () => {
                                     <div className="flex justify-between items-start mb-1 min-w-[250px]">
                                         <div>
                                             <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">
-                                                {risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}
-                                            </div>
+                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">{risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}</div>
                                         </div>
                                         {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
                                             <div className="flex gap-1 ml-2">
@@ -408,7 +404,6 @@ const App: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                    
                                     {risk.driverReportDetails ? (
                                         <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
                                             <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
@@ -420,21 +415,15 @@ const App: React.FC = () => {
                                             <div className="text-xs space-y-1 mb-2">
                                                 {risk.driverReportDetails.ubicacionManual && <p><b>Ubicación Manual:</b> {risk.driverReportDetails.ubicacionManual}</p>}
                                                 <p className="flex items-center gap-1 text-red-600 font-bold"><ShieldAlert size={12}/> {risk.driverReportDetails.huboDesvio ? 'Desvío Activado' : 'Sin Desvío'}</p>
-                                                {risk.driverReportDetails.rutaAlternativa && <p className="text-gray-600 ml-4">Ruta: {risk.driverReportDetails.rutaAlternativa}</p>}
-                                                {risk.driverReportDetails.velocidadSugerida && <p className="text-yellow-600 font-medium">Velocidad Precautoria: {risk.driverReportDetails.velocidadSugerida} km/h</p>}
-                                                {risk.driverReportDetails.carrilRecomendado && <p className="text-sky-600 font-medium">Carril: {risk.driverReportDetails.carrilRecomendado}</p>}
                                             </div>
-                                            {risk.description && <div className="bg-white p-2 rounded text-xs text-gray-700 italic border border-gray-200">"{risk.description}"</div>}
                                         </div>
                                     ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
                                    
                                     <div className="flex gap-2 items-center mb-2">
                                         {Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
-                                        {risk.videoUrl && <a href={risk.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-sky-500"><Video size={20} /></a>}
-                                        {risk.driveUrl && <a href={risk.driveUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-green-500"><Folder size={20} /></a>}
                                     </div>
 
-                                    {associatedRoutes.length > 0 && (
+                                    {Array.isArray(associatedRoutes) && associatedRoutes.length > 0 && (
                                         <div className="mt-2 pt-2 border-t">
                                             <h4 className="font-semibold text-sm text-gray-800">Recorridos Afectados:</h4>
                                             <ul className="list-disc list-inside text-xs text-gray-600 max-h-24 overflow-y-auto">{associatedRoutes.map(r => <li key={r.id}>{r.name}</li>)}</ul>
