@@ -262,23 +262,32 @@ const App: React.FC = () => {
     },[currentUser]);
    
     // IMPORTANTE: COMPRESOR KML ACTIVO AQUÍ PARA EVITAR EL LIMITE DE 1MB DE FIREBASE
+    // IMPORTANTE: COMPRESOR KML AGRESIVO PARA FIREBASE
     const handleAddRoute = useCallback((name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const rawGeoJson = kml(new DOMParser().parseFromString(event.target?.result as string, 'application/xml')) as any;
                 
-                // COMPRESIÓN DE DATOS (Evita que Firebase rebote el archivo por ser muy pesado)
                 const geoJson = {
                     ...rawGeoJson,
                     features: Array.isArray(rawGeoJson.features) ? rawGeoJson.features.map((f: any) => {
                         if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) {
+                            // 1. LIMITAR CANTIDAD DE PUNTOS (Evita que Firebase explote por peso)
+                            let coords = f.geometry.coordinates;
+                            if (coords.length > 300) {
+                                // Si tiene más de 300 puntos, calculamos un salto para quedarnos solo con 300 distribuidos
+                                const step = Math.ceil(coords.length / 300);
+                                coords = coords.filter((_: any, index: number) => index % step === 0);
+                            }
+
                             return {
                                 ...f,
-                                properties: { name: f.properties?.name }, // Borra propiedades extra basura de Google Earth
+                                properties: { name: f.properties?.name }, // Borramos propiedades basura
                                 geometry: {
                                     ...f.geometry,
-                                    coordinates: f.geometry.coordinates.map((c: any) => [ Number(Number(c[0]).toFixed(5)), Number(Number(c[1]).toFixed(5)) ])
+                                    // 2. REDONDEAR DECIMALES
+                                    coordinates: coords.map((c: any) =>[ Number(Number(c[0]).toFixed(5)), Number(Number(c[1]).toFixed(5)) ])
                                 }
                             };
                         }
@@ -292,8 +301,8 @@ const App: React.FC = () => {
             } catch (error) { alert("Error al procesar el archivo KML."); }
         };
         reader.readAsText(kmlFile);
-    },[proximityDistance]);
-   
+    }, [proximityDistance]);
+       
     const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
 
     // MAP FILTER TTL
