@@ -1,24 +1,87 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
+// Importamos el Storage para guardar los KML pesados
+import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import type { Route, Risk, RiskType, User, Siniestro } from '../types';
 
-// 👇 MANTÉN TUS CLAVES AQUÍ 👇
+// 👇 PEGA AQUÍ TUS NUEVAS CLAVES DE FIREBASE (Servidor US-CENTRAL) 👇
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBiSZHiOG4NPh7nC298DG48t2ARPbR0kWs",
-  authDomain: "riesgo-vial.firebaseapp.com",
-  projectId: "riesgo-vial",
-  storageBucket: "riesgo-vial.firebasestorage.app",
-  messagingSenderId: "204923217648",
-  appId: "1:204923217648:web:5b655f6469f5ad306e0435"
+  apiKey: "AIzaSyAu_98dHDW30SwUExej7WlMd9BM-Ryz4qs",
+  authDomain: "riesgovial-version2.firebaseapp.com",
+  projectId: "riesgovial-version2",
+  storageBucket: "riesgovial-version2.firebasestorage.app",
+  messagingSenderId: "694525740509",
+  appId: "1:694525740509:web:3fb69ccee63935408e6234"
 };
 
 let db: any;
-try { const app = initializeApp(firebaseConfig); db = getFirestore(app); } catch (e) { console.warn("Firebase offline"); }
+let storage: any;
+try { 
+    const app = initializeApp(firebaseConfig); 
+    db = getFirestore(app); 
+    storage = getStorage(app); 
+} catch (e) { 
+    console.warn("Firebase offline"); 
+}
 
-export const saveRouteToDB = async (route: Route) => { if(db) await setDoc(doc(db, "routes", route.id), route); };
-export const loadRoutesFromDB = async (): Promise<Route[]> => { if(!db) throw new Error("No DB"); return (await getDocs(collection(db, "routes"))).docs.map(d => d.data() as Route); };
-export const deleteRouteFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "routes", id)); };
+// ==========================================================
+// RUTAS (GUARDA EL KML EN STORAGE PARA EVITAR LÍMITE DE 1MB)
+// ==========================================================
+export const saveRouteToDB = async (route: Route) => { 
+    if(!db || !storage) return; 
 
+    let downloadUrl = route.geoJsonUrl || '';
+
+    // 1. Subimos el mapa pesado a Storage como un archivo JSON
+    if (route.geoJson) {
+        const storageRef = ref(storage, `routes/${route.id}.json`);
+        const geoJsonString = JSON.stringify(route.geoJson);
+        await uploadString(storageRef, geoJsonString, 'raw', { contentType: 'application/json' });
+        downloadUrl = await getDownloadURL(storageRef);
+    }
+
+    // 2. Guardamos los textos en Firestore, apuntando a la URL del archivo
+    const routeToSave = { ...route, geoJsonUrl: downloadUrl };
+    delete (routeToSave as any).geoJson; // Eliminamos lo pesado antes de enviar a Firestore
+
+    await setDoc(doc(db, "routes", route.id), routeToSave); 
+};
+
+export const loadRoutesFromDB = async (): Promise<Route[]> => { 
+    if(!db) throw new Error("No DB"); 
+    const snap = await getDocs(collection(db, "routes"));
+    const routesData = snap.docs.map(d => d.data());
+
+    // 3. Al cargar la app, descargamos los mapas en base a las URLs guardadas
+    const fullRoutes = await Promise.all(routesData.map(async (r: any) => {
+        if (r.geoJsonUrl) {
+            try {
+                const response = await fetch(r.geoJsonUrl);
+                r.geoJson = await response.json();
+            } catch (e) {
+                console.error(`Error descargando mapa para la ruta ${r.name}`, e);
+                r.geoJson = null;
+            }
+        }
+        return r as Route;
+    }));
+
+    return fullRoutes;
+};
+
+export const deleteRouteFromDB = async (id: string) => { 
+    if(!db) return; 
+    await deleteDoc(doc(db, "routes", id)); 
+    if (storage) {
+        try { await deleteObject(ref(storage, `routes/${id}.json`)); } 
+        catch (e) { console.warn("El archivo no existía en Storage."); }
+    }
+};
+
+// ==========================================================
+// RESTO DE COLECCIONES (Ligeras - Van directo a Firestore)
+// ==========================================================
 export const saveRiskToDB = async (risk: Risk) => { if(db) await setDoc(doc(db, "risks", risk.id), risk); };
 export const loadRisksFromDB = async (): Promise<Risk[]> => { if(!db) throw new Error("No DB"); return (await getDocs(collection(db, "risks"))).docs.map(d => d.data() as Risk); };
 export const deleteRiskFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "risks", id)); };
@@ -31,7 +94,5 @@ export const saveUserToDB = async (user: User) => { if(db) await setDoc(doc(db, 
 export const loadUsersFromDB = async (): Promise<User[]> => { if(!db) throw new Error("No DB"); return (await getDocs(collection(db, "users"))).docs.map(d => d.data() as User); };
 export const deleteUserFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "users", id)); };
 
-// NUEVO: SINIESTROS
 export const saveSiniestroToDB = async (siniestro: Siniestro) => { if(db) await setDoc(doc(db, "siniestros", siniestro.id), siniestro); };
-export const loadSiniestrosFromDB = async (): Promise<Siniestro[]> => { if(!db) throw new Error("No DB"); return (await getDocs(collection(db, "siniestros"))).docs.map(d => d.data() as Siniestro); };
-export const deleteSiniestroFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "siniestros", id)); };
+export const loadSiniestrosFromDB = async (): Promise<Siniestro
