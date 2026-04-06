@@ -24,14 +24,14 @@ try {
 }
 
 // ==========================================================
-// RUTAS (GUARDA EL KML EN STORAGE PARA EVITAR LÍMITE DE 1MB)
+// RUTAS (ESTRATEGIA ESTRICTA PARA EVITAR ARRAYS ANIDADOS)
 // ==========================================================
 export const saveRouteToDB = async (route: Route) => { 
     if(!db || !storage) return; 
 
     let downloadUrl = route.geoJsonUrl || '';
 
-    // 1. Subimos el mapa pesado a Storage como un archivo JSON
+    // 1. Subimos el mapa pesado a Storage como archivo .json
     if (route.geoJson) {
         const storageRef = ref(storage, `routes/${route.id}.json`);
         const geoJsonString = JSON.stringify(route.geoJson);
@@ -39,10 +39,17 @@ export const saveRouteToDB = async (route: Route) => {
         downloadUrl = await getDownloadURL(storageRef);
     }
 
-    // 2. Guardamos los textos en Firestore, apuntando a la URL del archivo
-    const routeToSave = { ...route, geoJsonUrl: downloadUrl };
-    delete (routeToSave as any).geoJson; // Eliminamos lo pesado antes de enviar a Firestore
+    // 2. EXTRACCIÓN ESTRICTA: Separamos el geoJson del resto de la ruta.
+    // routeSinMapa contiene todo (id, name, group...) EXCEPTO geoJson.
+    const { geoJson, ...routeSinMapa } = route;
+    
+    // 3. Preparamos el objeto final asegurando que no tiene arrays anidados
+    const routeToSave = { 
+        ...routeSinMapa, 
+        geoJsonUrl: downloadUrl 
+    };
 
+    // 4. Guardamos en Firestore (ahora 100% libre de "basura" geográfica)
     await setDoc(doc(db, "routes", route.id), routeToSave); 
 };
 
@@ -51,7 +58,7 @@ export const loadRoutesFromDB = async (): Promise<Route[]> => {
     const snap = await getDocs(collection(db, "routes"));
     const routesData = snap.docs.map(d => d.data());
 
-    // 3. Al cargar la app, descargamos los mapas en base a las URLs guardadas
+    // Al cargar la app, descargamos los mapas en base a las URLs guardadas
     const fullRoutes = await Promise.all(routesData.map(async (r: any) => {
         if (r.geoJsonUrl) {
             try {
