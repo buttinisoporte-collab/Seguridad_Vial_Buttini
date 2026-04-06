@@ -93,4 +93,4 @@ export const loadUsersFromDB = async (): Promise<User[]> => { if(!db) throw new 
 export const deleteUserFromDB = async (id: string) => { if(db) await deleteDoc(doc(db, "users", id)); };
 
 export const saveSiniestroToDB = async (siniestro: Siniestro) => { if(db) await setDoc(doc(db, "siniestros", siniestro.id), siniestro); };
-export const loadSiniestrosFromDB = async (): Promise<Siniestro
+export const loadSiniestrosFromDB = async (): Promise<Siniestro;
