@@ -16,7 +16,6 @@ export interface Risk {
     driverReportDetails?: DriverReportDetails; timestamp?: number;
 }
 
-// NUEVO MODELO: Siniestro Vial (IRAM 3810)
 export interface Siniestro {
     id: string; timestamp: number; fechaHora: string;
     ubicacion: { lat?: number; lng?: number; manual: string; lugar: string; };
@@ -26,7 +25,8 @@ export interface Siniestro {
     pasajerosTestigos: { lesionados: boolean; cantidad?: string; testigos?: string; };
     entorno: { clima: string; calzada: string; iluminacion: string; };
     autoridades: { intervino: boolean; dependencia?: string; alcoholemia?: boolean; resultadoAlcoholemia?: string; };
-    driveUrl: string; // Enlace a la carpeta con las fotos (Para evitar saturar la base de datos con base64)
+    images: string[]; // NUEVO: Lista de fotos subidas directamente
+    driveUrl?: string; 
 }
 
 export interface GeoJSONFeature<T> { type: "Feature"; properties: any; geometry: T; }

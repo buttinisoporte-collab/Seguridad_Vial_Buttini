@@ -2,6 +2,8 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import type { Route, Risk, RiskType, User, Siniestro } from '../types';
+import { getStorage, ref, uploadString, getDownloadURL, deleteObject, uploadBytes } from "firebase/storage";
+
 
 // 👇 PEGA AQUÍ TUS CLAVES DE FIREBASE 👇
 const firebaseConfig = {
@@ -22,6 +24,13 @@ try {
 } catch (e) { 
     console.warn("Firebase offline"); 
 }
+
+export const uploadSiniestroImage = async (siniestroId: string, file: File): Promise<string> => {
+    if (!storage) throw new Error("Storage no inicializado");
+    const imageRef = ref(storage, `siniestros/${siniestroId}/${file.name}_${Date.now()}`);
+    await uploadBytes(imageRef, file);
+    return await getDownloadURL(imageRef);
+};
 
 // ==========================================================
 // RUTAS (ESTRATEGIA ESTRICTA PARA EVITAR ARRAYS ANIDADOS)
