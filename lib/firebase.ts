@@ -1,11 +1,9 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
-// Importamos el Storage para guardar los KML pesados
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import type { Route, Risk, RiskType, User, Siniestro } from '../types';
 
-// 👇 PEGA AQUÍ TUS NUEVAS CLAVES DE FIREBASE (Servidor US-CENTRAL) 👇
-
+// 👇 PEGA AQUÍ TUS CLAVES DE FIREBASE 👇
 const firebaseConfig = {
   apiKey: "AIzaSyAu_98dHDW30SwUExej7WlMd9BM-Ryz4qs",
   authDomain: "riesgovial-version2.firebaseapp.com",
