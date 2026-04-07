@@ -40,7 +40,7 @@ export const Panel: React.FC<PanelProps> = ({
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition
     showAllRoutes={showAllRoutes}
     setShowAllRoutes={setShowAllRoutes}
-}) => {
+});
 
     const renderTabContent = () => {
         switch (activeTab) {
