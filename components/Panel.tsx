@@ -46,7 +46,7 @@ export const Panel: React.FC<PanelProps> = ({
     currentUser, onLogout, users, setUsers, riskTypes, setRiskTypes, routes, setRoutes, risks, setRisks, siniestros, handleDeleteSiniestro,
     proximityDistance, setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
-    riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes
+    riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
     telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk
     }) => {
 
