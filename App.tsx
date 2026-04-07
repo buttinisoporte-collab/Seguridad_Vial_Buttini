@@ -98,6 +98,7 @@ const App: React.FC = () => {
     const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const [showAllRoutes, setShowAllRoutes] = useState(true); // Controla si se ven las trazas en el mapa
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
@@ -334,16 +335,29 @@ const App: React.FC = () => {
     }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL]);
 
     const visibleRoutes = useMemo(() => {
-        if (!Array.isArray(routes)) return[];
-        if (activeTab === 'routes') return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || (route.group||'').toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || (route.line||'').toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || (route.service||'').toLowerCase().includes(filterService.toLowerCase())));
-        else if (activeTab === 'reports') return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) :[];
-        else if (activeTab === 'riskViewer') {
+        if (!showAllRoutes) return []; // <-- SI EL CHECK ESTÁ DESACTIVADO, MAPA VACÍO
+        
+        if (!Array.isArray(routes)) return [];
+        if (activeTab === 'routes') {
+            if (activeRouteId) return routes.filter(r => r.id === activeRouteId);
+            return routes.filter(route => 
+                (filterGroup === '' || (route.group || '').toLowerCase().includes(filterGroup.toLowerCase())) && 
+                (filterLine === '' || (route.line || '').toLowerCase().includes(filterLine.toLowerCase())) && 
+                (filterService === '' || (route.service || '').toLowerCase().includes(filterService.toLowerCase()))
+            );
+        } else if (activeTab === 'reports') {
+            return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) : [];
+        } else if (activeTab === 'riskViewer') {
             const affectedRouteIds = new Set<string>();
-            baseVisibleRisks.forEach(risk => { if (Array.isArray(riskViewerSelectedTypes) && riskViewerSelectedTypes.includes(risk.riskTypeId)) (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).forEach(id => affectedRouteIds.add(id)); });
+            baseVisibleRisks.forEach(risk => { 
+                if (Array.isArray(riskViewerSelectedTypes) && riskViewerSelectedTypes.includes(risk.riskTypeId)) {
+                    (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []).forEach(id => affectedRouteIds.add(id)); 
+                }
+            });
             return routes.filter(route => affectedRouteIds.has(route.id));
         }
         return routes;
-    },[routes, activeTab, filterGroup, filterLine, filterService, activeRouteId, reportSelectedRouteId, riskViewerSelectedTypes, baseVisibleRisks]);
+    }, [routes, activeTab, filterGroup, filterLine, filterService, activeRouteId, reportSelectedRouteId, riskViewerSelectedTypes, baseVisibleRisks, showAllRoutes]); // <-- IMPORTANTE AGREGAR showAllRoutes AQUÍ AL FINAL
 
     const visibleRisks = useMemo(() => {
         if (activeTab === 'routes') { const visibleRouteIds = new Set(visibleRoutes.map(r => r.id)); return baseVisibleRisks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).some(id => visibleRouteIds.has(id))); }
@@ -358,8 +372,28 @@ const App: React.FC = () => {
 
     if (isDriverMode) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
-        if (!currentDriver) return <Login users={users} isDriverMode={true} onLogin={(d) => { setCurrentDriver(d); localStorage.setItem('currentDriver', JSON.stringify(d)); }} />;
-        return <DriverApp routes={routes} currentDriver={currentDriver} onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }} onSaveReport={(newRisk) => setRisks(prev =>[...prev, { ...newRisk, associatedRouteIds: findAssociatedRouteIds(newRisk.position) }])} />;
+        
+        if (!currentDriver) {
+            return <Login users={users} isDriverMode={true} onLogin={(d) => { setCurrentDriver(d); localStorage.setItem('currentDriver', JSON.stringify(d)); }} />;
+        }
+        
+        return <DriverApp 
+            routes={routes} // Asegúrate de pasarle las rutas para los filtros nuevos
+            currentDriver={currentDriver} 
+            onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }}
+            onSaveReport={(newRisk) => {
+                // Buscamos un tipo que NO sea incidente (siniestro) para el color negro o riesgo genérico
+                // Si no existe 'incidente-ruta' (negro), usamos el primer riesgo disponible
+                const riskType = riskTypes.find(rt => rt.id === 'incidente-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
+                
+                const finalizedRisk = { 
+                    ...newRisk, 
+                    riskTypeId: riskType.id, 
+                    associatedRouteIds: findAssociatedRouteIds(newRisk.position) 
+                };
+                setRisks(prev => [...prev, finalizedRisk]);
+            }} 
+        />;
     }
 
     if (publicRouteId) {
@@ -385,6 +419,8 @@ const App: React.FC = () => {
                 activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} reportSelectedRouteId={reportSelectedRouteId} setReportSelectedRouteId={setReportSelectedRouteId}
                 riskViewerSelectedTypes={riskViewerSelectedTypes} setRiskViewerSelectedTypes={setRiskViewerSelectedTypes} togglePublicRoute={togglePublicRoute} handleDeleteRisk={handleDeleteRisk}
                 setFocusPosition={setFocusPosition}
+                showAllRoutes={showAllRoutes}
+                setShowAllRoutes={setShowAllRoutes}
             />
             <main className="flex-1 h-full relative">
                  <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">

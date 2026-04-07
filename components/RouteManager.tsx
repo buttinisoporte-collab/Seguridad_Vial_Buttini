@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Route } from '../types';
 import { AddRouteModal } from './AddRouteModal';
-import { MapPin, PlusCircle, Trash2, Link as LinkIcon } from 'lucide-react';
+import { MapPin, PlusCircle, Trash2, Link as LinkIcon, Eye, EyeOff } from 'lucide-react';
 
 interface RouteManagerProps {
     routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
@@ -13,99 +13,86 @@ interface RouteManagerProps {
     filterService: string; setFilterService: (v: string) => void;
     activeRouteId: string | null; setActiveRouteId: (v: string | null) => void;
     togglePublicRoute: (id: string) => void;
-    isAdmin: boolean; // NUEVA PROP PARA PERMISOS
+    isAdmin: boolean;
+    showAllRoutes: boolean; setShowAllRoutes: (v: boolean) => void; // NUEVA PROP
 }
 
 export const RouteManager: React.FC<RouteManagerProps> = ({ 
-    routes, onAddRoute, setRoutes,
-    showRisks, setShowRisks, showIncidents, setShowIncidents,
+    routes, onAddRoute, setRoutes, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService,
-    activeRouteId, setActiveRouteId, togglePublicRoute, isAdmin
+    activeRouteId, setActiveRouteId, togglePublicRoute, isAdmin, showAllRoutes, setShowAllRoutes
 }) => {
-    const[isModalOpen, setIsModalOpen] = useState(false);
-    
-    const deleteRoute = (id: string) => {
-        if (!isAdmin) return alert("No tienes permisos para eliminar.");
-        if(window.confirm("¿Está seguro que desea eliminar este recorrido?")) {
-            setRoutes(routes.filter(route => route.id !== id));
-            if (activeRouteId === id) setActiveRouteId(null);
-        }
-    };
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Obtener valores únicos de la BD para los filtros
+    const uniqueGroups = useMemo(() => Array.from(new Set(routes.map(r => r.group))).sort(), [routes]);
+    const uniqueLines = useMemo(() => Array.from(new Set(routes.map(r => r.line))).sort(), [routes]);
+    const uniqueServices = useMemo(() => Array.from(new Set(routes.map(r => r.service))).sort(), [routes]);
 
     const handleShare = (e: React.MouseEvent, route: Route) => {
         e.stopPropagation();
         togglePublicRoute(route.id);
+        const url = `${window.location.origin}${window.location.pathname}?publicRoute=${route.id}`;
         if (!route.isPublic) {
-            const url = `${window.location.origin}${window.location.pathname}?publicRoute=${route.id}`;
-            navigator.clipboard.writeText(url).then(() => {
-                alert(`Enlace público habilitado y copiado al portapapeles:\n\n${url}\n\nPuede enviarlo a los conductores.`);
-            });
+            navigator.clipboard.writeText(url).then(() => alert(`Link copiado para conductores.`));
         }
-    };
-
-    const handleFilterChange = (setter: (v: string) => void, value: string) => {
-        setter(value); setActiveRouteId(null);
     };
 
     const filteredRoutes = routes.filter(route => {
         return (
-            (filterGroup === '' || route.group.toLowerCase().includes(filterGroup.toLowerCase())) &&
-            (filterLine === '' || route.line.toLowerCase().includes(filterLine.toLowerCase())) &&
-            (filterService === '' || route.service.toLowerCase().includes(filterService.toLowerCase()))
+            (filterGroup === '' || route.group === filterGroup) &&
+            (filterLine === '' || route.line === filterLine) &&
+            (filterService === '' || route.service === filterService)
         );
     });
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-4">
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-sky-300">Recorridos</h2>
-                <button onClick={() => setIsModalOpen(true)} className="flex items-center bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-3 rounded-lg text-sm">
-                    <PlusCircle size={18} className="mr-2" /> Nuevo
-                </button>
+                <button onClick={() => setIsModalOpen(true)} className="bg-sky-500 hover:bg-sky-600 text-white p-2 rounded-lg transition-colors"><PlusCircle size={20} /></button>
             </div>
 
-            <div className="bg-gray-700 p-3 rounded-lg mb-4 flex gap-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" checked={showRisks} onChange={(e) => setShowRisks(e.target.checked)} className="rounded text-sky-500 focus:ring-sky-500 bg-gray-800 border-gray-600" />
-                    <span className="text-sm font-medium text-gray-200">Ver Riesgos Viales</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" checked={showIncidents} onChange={(e) => setShowIncidents(e.target.checked)} className="rounded text-red-500 focus:ring-red-500 bg-gray-800 border-gray-600" />
-                    <span className="text-sm font-medium text-gray-200">Ver Siniestros</span>
-                </label>
+            {/* Check Mostrar Todos */}
+            <label className="flex items-center space-x-3 bg-gray-700/50 p-3 rounded-xl border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all">
+                <input type="checkbox" checked={showAllRoutes} onChange={(e) => setShowAllRoutes(e.target.checked)} className="w-5 h-5 rounded text-sky-500 bg-gray-900 border-gray-600 focus:ring-0" />
+                <span className="text-sm font-bold text-gray-200 flex items-center gap-2">
+                    {showAllRoutes ? <Eye size={16} className="text-sky-400"/> : <EyeOff size={16} className="text-gray-500"/>}
+                    Visualizar trazas en mapa
+                </span>
+            </label>
+
+            {/* Filtros Desplegables con datos de la BD */}
+            <div className="grid grid-cols-1 gap-2">
+                <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
+                    <option value="">Todos los Grupos</option>
+                    {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                    <select value={filterLine} onChange={(e) => setFilterLine(e.target.value)} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
+                        <option value="">Línea...</option>
+                        {uniqueLines.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                    <select value={filterService} onChange={(e) => setFilterService(e.target.value)} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
+                        <option value="">Servicio...</option>
+                        {uniqueServices.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                <input type="text" placeholder="Filtrar Grupo" value={filterGroup} onChange={(e) => handleFilterChange(setFilterGroup, e.target.value)} className="bg-gray-700 text-white text-xs p-2 rounded border border-gray-600 focus:ring-sky-500 focus:border-sky-500" />
-                <input type="text" placeholder="Filtrar Línea" value={filterLine} onChange={(e) => handleFilterChange(setFilterLine, e.target.value)} className="bg-gray-700 text-white text-xs p-2 rounded border border-gray-600 focus:ring-sky-500 focus:border-sky-500" />
-                <input type="text" placeholder="Filtrar Servicio" value={filterService} onChange={(e) => handleFilterChange(setFilterService, e.target.value)} className="bg-gray-700 text-white text-xs p-2 rounded border border-gray-600 focus:ring-sky-500 focus:border-sky-500" />
-            </div>
-
-            <div className="space-y-3">
-                {filteredRoutes.length > 0 ? filteredRoutes.map(route => (
-                    <div key={route.id} onClick={() => setActiveRouteId(activeRouteId === route.id ? null : route.id)} className={`p-3 rounded-lg flex justify-between items-center cursor-pointer transition-colors border ${activeRouteId === route.id ? 'bg-sky-900 border-sky-500' : 'bg-gray-700 border-transparent hover:bg-gray-600'}`}>
-                        <div className="flex-1">
-                            <p className="font-semibold text-white">{route.name}</p>
-                            <div className="flex gap-2 text-[10px] text-sky-400 font-mono uppercase mb-1">
-                                <span>G: {route.group}</span><span>L: {route.line}</span><span>S: {route.service}</span>
-                            </div>
-                            <p className="text-xs text-gray-400">{route.origin} &rarr; {route.destination}</p>
+            <div className="space-y-2">
+                {filteredRoutes.map(route => (
+                    <div key={route.id} onClick={() => setActiveRouteId(activeRouteId === route.id ? null : route.id)} className={`p-3 rounded-lg flex justify-between items-center cursor-pointer transition-all border ${activeRouteId === route.id ? 'bg-sky-900/50 border-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.2)]' : 'bg-gray-800/40 border-transparent hover:border-gray-600'}`}>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-bold text-white text-sm truncate">{route.name}</p>
+                            <p className="text-[10px] text-sky-400 font-mono uppercase">G:{route.group} L:{route.line} S:{route.service}</p>
                         </div>
-                        <div className="flex items-center ml-2">
-                            <button onClick={(e) => handleShare(e, route)} className={`p-2 transition-colors ${route.isPublic ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-white'}`} title={route.isPublic ? "Deshabilitar acceso público" : "Habilitar acceso público a conductores"}>
-                                <LinkIcon size={18} />
-                            </button>
-                            {/* SOLO LOS ADMIN PUEDEN VER EL BOTON DE ELIMINAR */}
-                            {isAdmin && (
-                                <button onClick={(e) => { e.stopPropagation(); deleteRoute(route.id); }} className="text-red-400 hover:text-red-600 p-2 ml-1" title="Eliminar recorrido">
-                                    <Trash2 size={18} />
-                                </button>
-                            )}
+                        <div className="flex gap-1 ml-2">
+                            <button onClick={(e) => handleShare(e, route)} className={`p-2 rounded-md ${route.isPublic ? 'text-green-400 bg-green-900/20' : 'text-gray-500 hover:text-white'}`}><LinkIcon size={16} /></button>
+                            {isAdmin && <button onClick={(e) => { e.stopPropagation(); if(window.confirm('¿Eliminar?')) setRoutes(p => p.filter(r => r.id !== route.id)); }} className="text-red-400 hover:text-red-300 p-2"><Trash2 size={16} /></button>}
                         </div>
                     </div>
-                )) : (
-                    <div className="text-center py-8 px-4 bg-gray-700 rounded-lg"><MapPin size={40} className="mx-auto text-gray-500" /><p className="mt-2 text-gray-400">No se encontraron recorridos.</p></div>
-                )}
+                ))}
             </div>
             {isModalOpen && <AddRouteModal onClose={() => setIsModalOpen(false)} onAddRoute={onAddRoute} />}
         </div>
