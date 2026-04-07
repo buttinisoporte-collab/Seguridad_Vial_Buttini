@@ -285,19 +285,20 @@ const App: React.FC = () => {
             });
         } catch (e) { console.error("Error enviando Telegram", e); }
     };
-
+    // 3. Actualizar el guardado del conductor para disparar Telegram
     const handleDriverSave = useCallback((newRisk: Risk) => {
         const riskType = riskTypes.find(rt => rt.id === 'incidente-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
         const finalizedRisk = { 
             ...newRisk, 
             riskTypeId: riskType?.id || '1', 
             associatedRouteIds: findAssociatedRouteIds(newRisk.position),
-            isVisibleOnMap: true 
+            isVisibleOnMap: true  // Por defecto visible
         };
         setRisks(prev =>[...prev, finalizedRisk]);
+        // DISPARAMOS TELEGRAM 👇
         sendTelegramNotification(finalizedRisk);
     },[riskTypes, findAssociatedRouteIds, telegramToken, telegramChatId]);
-    // ---------------------------------------------------
+  
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
@@ -346,12 +347,14 @@ const App: React.FC = () => {
    
     const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
 
-    // --- FILTRO DEL MAPA CON OPCIÓN "isVisibleOnMap" ---
+    // 4. Actualizar el filtro base del mapa (baseVisibleRisks) para respetar el EyeToggle
     const baseVisibleRisks = useMemo(() => Array.isArray(risks) ? risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
         if (!rt) return false;
         
-        if (risk.isVisibleOnMap === false) return false; // RESPETA EL TOGGLE DEL OJO
+        // SI EL USUARIO LO OCULTÓ MANUALMENTE, NO SE VE EN MAPA 👇
+        if (risk.isVisibleOnMap === false) return false;
+
         if (rt.isIncident && !showIncidents) return false;
         if (!rt.isIncident && !showRisks) return false;
 
@@ -360,7 +363,7 @@ const App: React.FC = () => {
             if (ageInHours > driverReportTTL) return false;
         }
         return true;
-    }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL]);
+    }) : [], [risks, getRiskType, showRisks, showIncidents, driverReportTTL]);
 
     const visibleRoutes = useMemo(() => {
         if (!showAllRoutes) return []; 
