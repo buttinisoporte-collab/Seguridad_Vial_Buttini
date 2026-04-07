@@ -31,6 +31,15 @@ interface PanelProps {
     riskViewerSelectedTypes: string[]; setRiskViewerSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
     togglePublicRoute: (id: string) => void; handleDeleteRisk: (id: string) => void;
     setFocusPosition: React.Dispatch<React.SetStateAction<Position | null>>;
+    showAllRoutes: boolean; 
+    setShowAllRoutes: (v: boolean) => void;
+    // 👇 PEGAR ESTO AQUÍ 👇
+    telegramToken: string;
+    setTelegramToken: (v: string) => void;
+    telegramChatId: string;
+    setTelegramChatId: (v: string) => void;
+    onUpdateRisk: (risk: Risk) => void;
+    
 }
 
 export const Panel: React.FC<PanelProps> = ({
@@ -38,6 +47,7 @@ export const Panel: React.FC<PanelProps> = ({
     proximityDistance, setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes
+    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk
     }) => {
 
     const renderTabContent = () => {
@@ -45,10 +55,10 @@ export const Panel: React.FC<PanelProps> = ({
             case 'routes': return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} isAdmin={currentUser.isAdmin} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes} />;
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} />;
-            case 'novedades': return <NovedadesList risks={risks} onFocusPosition={setFocusPosition} />;
+            case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} />;
             case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} handleDeleteSiniestro={handleDeleteSiniestro} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
-            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} />;
+            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
             default: return null;
         }

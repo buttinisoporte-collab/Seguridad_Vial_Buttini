@@ -14,6 +14,7 @@ export interface Risk {
     id: string; position: Position; riskTypeId: string; description: string;
     associatedRouteIds: string[]; images: string[]; videoUrl?: string; driveUrl?: string;
     driverReportDetails?: DriverReportDetails; timestamp?: number;
+    isVisibleOnMap?: boolean; // NUEVO: Control manual de visibilidad
 }
 
 export interface Siniestro {
