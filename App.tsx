@@ -95,16 +95,14 @@ const App: React.FC = () => {
     const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const [showAllRoutes, setShowAllRoutes] = useState(true); 
+    const[showAllRoutes, setShowAllRoutes] = useState(true); 
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
-    // --- ESTADOS PARA TELEGRAM ---
     const[telegramToken, setTelegramToken] = useState(() => localStorage.getItem('tg_token') || '');
     const[telegramChatId, setTelegramChatId] = useState(() => localStorage.getItem('tg_chat') || '');
 
     useEffect(() => { localStorage.setItem('tg_token', telegramToken); }, [telegramToken]);
     useEffect(() => { localStorage.setItem('tg_chat', telegramChatId); }, [telegramChatId]);
-    // -----------------------------
 
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
@@ -168,7 +166,6 @@ const App: React.FC = () => {
         initData();
     },[]);
 
-    // Sincronizaciones DB y LocalStorage
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
@@ -176,7 +173,12 @@ const App: React.FC = () => {
         const deleted = prev.filter(p => !routes.find(c => c.id === p.id));
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
         deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
-        added.forEach(c => saveRouteToDB(c).catch((e) => console.error("Error al subir a Firebase:", e)));
+        added.forEach(c => {
+            saveRouteToDB(c).catch((e) => {
+                console.error("Error al subir a Firebase:", e);
+                alert(`ADVERTENCIA: La ruta "${c.name}" no se pudo guardar en la nube. Intente con un KML más pequeño.`);
+            });
+        });
         prevRoutesRef.current = routes;
     },[routes, isLoadingData]);
 
@@ -254,58 +256,39 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
-    // --- FUNCIÓN TELEGRAM Y GUARDADO DEL CONDUCTOR ---
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
-        
         const d = risk.driverReportDetails;
         if (!d) return;
 
-        const message = `
-🚨 *NUEVA NOVEDAD EN RUTA* 🚨
----------------------------
-👤 *Conductor:* ${d.conductorName}
-🚌 *Unidad:* ${d.unidad}
-🛣️ *Línea:* ${d.linea}
-⚠️ *Tipo:* ${d.categoriaIRAM}
-🔄 *Sentido:* ${d.sentido}
-🚧 *¿Desvío?:* ${d.huboDesvio ? 'SÍ' : 'NO'}
-📍 *Ubicación:* ${d.ubicacionManual || 'Coordenadas GPS'}
-
-📝 *Detalles:* ${risk.description || 'Sin observaciones'}
----------------------------
-📌[Ver en el Mapa de Riesgo](${window.location.origin}/?publicRoute=${risk.associatedRouteIds?.[0] || 'default'})
-        `.trim();
+        const message = `🚨 *NUEVA NOVEDAD EN RUTA* 🚨\n---------------------------\n👤 *Conductor:* ${d.conductorName}\n🚌 *Unidad:* ${d.unidad}\n🛣️ *Línea:* ${d.linea}\n⚠️ *Tipo:* ${d.categoriaIRAM}\n🔄 *Sentido:* ${d.sentido}\n🚧 *¿Desvío?:* ${d.huboDesvio ? 'SÍ' : 'NO'}\n📍 *Ubicación:* ${d.ubicacionManual || 'Coordenadas GPS'}\n📝 *Detalles:* ${risk.description || 'Sin observaciones'}\n---------------------------\n📌 [Ver en el Mapa de Riesgo](${window.location.origin}/?publicRoute=${risk.associatedRouteIds?.[0] || 'default'})`.trim();
 
         try {
             await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: telegramChatId, text: message, parse_mode: 'Markdown' })
             });
         } catch (e) { console.error("Error enviando Telegram", e); }
     };
-    // 3. Actualizar el guardado del conductor para disparar Telegram
+
     const handleDriverSave = useCallback((newRisk: Risk) => {
         const riskType = riskTypes.find(rt => rt.id === 'incidente-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
         const finalizedRisk = { 
             ...newRisk, 
             riskTypeId: riskType?.id || '1', 
             associatedRouteIds: findAssociatedRouteIds(newRisk.position),
-            isVisibleOnMap: true  // Por defecto visible
+            isVisibleOnMap: true 
         };
         setRisks(prev =>[...prev, finalizedRisk]);
-        // DISPARAMOS TELEGRAM 👇
         sendTelegramNotification(finalizedRisk);
     },[riskTypes, findAssociatedRouteIds, telegramToken, telegramChatId]);
-  
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
     const handleMapClick = useCallback((latlng: LatLng) => {
         const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); }
-    },[activeTab, currentUser]);
+    }, [activeTab, currentUser]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
@@ -347,12 +330,10 @@ const App: React.FC = () => {
    
     const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
 
-    // 4. Actualizar el filtro base del mapa (baseVisibleRisks) para respetar el EyeToggle
     const baseVisibleRisks = useMemo(() => Array.isArray(risks) ? risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
         if (!rt) return false;
         
-        // SI EL USUARIO LO OCULTÓ MANUALMENTE, NO SE VE EN MAPA 👇
         if (risk.isVisibleOnMap === false) return false;
 
         if (rt.isIncident && !showIncidents) return false;
@@ -363,10 +344,10 @@ const App: React.FC = () => {
             if (ageInHours > driverReportTTL) return false;
         }
         return true;
-    }) : [], [risks, getRiskType, showRisks, showIncidents, driverReportTTL]);
+    }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL]);
 
     const visibleRoutes = useMemo(() => {
-        if (!showAllRoutes) return []; 
+        if (!showAllRoutes) return[]; 
         if (!Array.isArray(routes)) return[];
         if (activeTab === 'routes') return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || (route.group||'').toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || (route.line||'').toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || (route.service||'').toLowerCase().includes(filterService.toLowerCase())));
         else if (activeTab === 'reports') return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) :[];
@@ -392,13 +373,7 @@ const App: React.FC = () => {
     if (isDriverMode) {
         if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold">Cargando Sistema...</div>;
         if (!currentDriver) return <Login users={users} isDriverMode={true} onLogin={(d) => { setCurrentDriver(d); localStorage.setItem('currentDriver', JSON.stringify(d)); }} />;
-        
-        return <DriverApp 
-            routes={routes} 
-            currentDriver={currentDriver} 
-            onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }} 
-            onSaveReport={handleDriverSave} // <--- SE PASA LA FUNCIÓN CON TELEGRAM AQUI
-        />;
+        return <DriverApp routes={routes} currentDriver={currentDriver} onLogout={() => { setCurrentDriver(null); localStorage.removeItem('currentDriver'); }} onSaveReport={handleDriverSave} />;
     }
 
     if (publicRouteId) {
@@ -424,15 +399,8 @@ const App: React.FC = () => {
                 activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} reportSelectedRouteId={reportSelectedRouteId} setReportSelectedRouteId={setReportSelectedRouteId}
                 riskViewerSelectedTypes={riskViewerSelectedTypes} setRiskViewerSelectedTypes={setRiskViewerSelectedTypes} togglePublicRoute={togglePublicRoute} handleDeleteRisk={handleDeleteRisk}
                 setFocusPosition={setFocusPosition} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes}
-                
-                // --- NUEVAS PROPS PARA EL PANEL ---
-                telegramToken={telegramToken}
-                setTelegramToken={setTelegramToken}
-                telegramChatId={telegramChatId}
-                setTelegramChatId={setTelegramChatId}
-                onUpdateRisk={(updatedRisk) => {
-                    setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r));
-                }}
+                telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId}
+                onUpdateRisk={(updatedRisk) => setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r))}
             />
             <main className="flex-1 h-full relative">
                  <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
@@ -454,7 +422,13 @@ const App: React.FC = () => {
                         }
                         if (path.length === 0) return null;
                         const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer') ? 1 : 0.4;
-                        return <Polyline key={route.id} positions={path} color="#0284c7" weight={5} opacity={opacity} />;
+                        
+                        // LÓGICA DE COLOR POR GRUPO
+                        let routeColor = "#0284c7"; // Celeste default
+                        if (route.group && route.group.includes('540')) routeColor = "#ef4444"; // Rojo
+                        else if (route.group && route.group.includes('570')) routeColor = "#3b82f6"; // Azul oscuro
+
+                        return <Polyline key={route.id} positions={path} color={routeColor} weight={5} opacity={opacity} />;
                     })}
 
                     {visibleRisks.map(risk => {

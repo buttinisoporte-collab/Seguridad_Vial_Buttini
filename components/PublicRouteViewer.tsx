@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, Tooltip, CircleMarker } from 'react-leaflet';
 import L, { LatLngExpression, Icon } from 'leaflet';
 import type { Route, Risk, RiskType, Position } from '../types';
-import { Bus, Navigation } from 'lucide-react';
+import { Bus } from 'lucide-react';
 
-// Componente para ver la ubicación del conductor que abre el link
 const UserLocation = () => {
-    const [pos, setPos] = useState<Position | null>(null);
+    const[pos, setPos] = useState<Position | null>(null);
     const map = useMap();
     useEffect(() => {
         const watchId = navigator.geolocation.watchPosition(
@@ -14,7 +13,7 @@ const UserLocation = () => {
             () => {}, { enableHighAccuracy: true }
         );
         return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+    },[]);
     return pos ? (
         <>
             <CircleMarker center={[pos.lat, pos.lng]} radius={10} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.8 }}>
@@ -31,20 +30,23 @@ const createRiskIcon = (color: string) => {
 };
 
 export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskTypes: RiskType[] }> = ({ route, risks, riskTypes }) => {
-    const path: LatLngExpression[] = [];
+    const path: LatLngExpression[] =[];
     if (route.geoJson?.features) {
         route.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString') f.geometry.coordinates.forEach(([lng, lat]) => path.push([lat, lng])); });
     }
 
-    // FILTRO: No mostrar siniestros (isIncident) en el link público
     const safeRisks = risks.filter(risk => {
         const type = riskTypes.find(rt => rt.id === risk.riskTypeId);
         return type && !type.isIncident; 
     });
 
+    // LÓGICA DE COLOR PARA GRUPOS 540 Y 570
+    let routeColor = "#38bdf8"; // Celeste por defecto
+    if (route.group && route.group.includes('540')) routeColor = "#ef4444"; // Rojo (Tailwind red-500)
+    else if (route.group && route.group.includes('570')) routeColor = "#3b82f6"; // Azul oscuro (Tailwind blue-500)
+
     return (
         <div className="h-screen w-screen relative overflow-hidden">
-            {/* Header Flotante Minimalista para Móvil */}
             <div className="absolute top-3 left-3 right-3 z-[1000] pointer-events-none">
                 <div className="bg-gray-900/90 backdrop-blur-md text-white p-3 rounded-2xl shadow-2xl border border-white/10 pointer-events-auto">
                     <div className="flex items-center justify-between">
@@ -62,7 +64,9 @@ export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskType
             <MapContainer center={[-34.6175, -68.335]} zoom={13} zoomControl={false} style={{ height: '100%' }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <UserLocation />
-                <Polyline positions={path} color="#38bdf8" weight={6} opacity={0.8} lineJoin="round" />
+                
+                {/* Aplicamos el color dinámico */}
+                <Polyline positions={path} color={routeColor} weight={6} opacity={0.8} lineJoin="round" />
                 
                 {safeRisks.map(risk => {
                     const rt = riskTypes.find(t => t.id === risk.riskTypeId);
