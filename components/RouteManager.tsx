@@ -14,7 +14,7 @@ interface RouteManagerProps {
     activeRouteId: string | null; setActiveRouteId: (v: string | null) => void;
     togglePublicRoute: (id: string) => void;
     isAdmin: boolean;
-    showAllRoutes: boolean; setShowAllRoutes: (v: boolean) => void; // NUEVA PROP
+    showAllRoutes: boolean; setShowAllRoutes: (v: boolean) => void;
 }
 
 export const RouteManager: React.FC<RouteManagerProps> = ({ 
@@ -22,29 +22,26 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService,
     activeRouteId, setActiveRouteId, togglePublicRoute, isAdmin, showAllRoutes, setShowAllRoutes
 }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const[isModalOpen, setIsModalOpen] = useState(false);
 
-    // Obtener valores únicos de la BD para los filtros
+    // Filtros lógicos y dependientes
     const uniqueGroups = useMemo(() => Array.from(new Set(routes.map(r => r.group))).sort(), [routes]);
-    const uniqueLines = useMemo(() => Array.from(new Set(routes.map(r => r.line))).sort(), [routes]);
-    const uniqueServices = useMemo(() => Array.from(new Set(routes.map(r => r.service))).sort(), [routes]);
+    const uniqueLines = useMemo(() => Array.from(new Set(routes.filter(r => !filterGroup || r.group === filterGroup).map(r => r.line))).sort(), [routes, filterGroup]);
+    
+    // Los servicios dependen de la línea filtrada (si hay una)
+    const uniqueServices = useMemo(() => Array.from(new Set(routes.filter(r => (!filterGroup || r.group === filterGroup) && (!filterLine || r.line === filterLine)).map(r => r.service))).sort(),[routes, filterGroup, filterLine]);
 
     const handleShare = (e: React.MouseEvent, route: Route) => {
         e.stopPropagation();
         togglePublicRoute(route.id);
         const url = `${window.location.origin}${window.location.pathname}?publicRoute=${route.id}`;
-        if (!route.isPublic) {
-            navigator.clipboard.writeText(url).then(() => alert(`Link copiado para conductores.`));
-        }
+        if (!route.isPublic) navigator.clipboard.writeText(url).then(() => alert(`Link copiado para conductores.`));
     };
 
+    // Orden alfabético ascendente por nombre
     const filteredRoutes = routes.filter(route => {
-        return (
-            (filterGroup === '' || route.group === filterGroup) &&
-            (filterLine === '' || route.line === filterLine) &&
-            (filterService === '' || route.service === filterService)
-        );
-    });
+        return (!filterGroup || route.group === filterGroup) && (!filterLine || route.line === filterLine) && (!filterService || route.service === filterService);
+    }).sort((a, b) => a.name.localeCompare(b.name));
 
     return (
         <div className="space-y-4">
@@ -53,7 +50,6 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
                 <button onClick={() => setIsModalOpen(true)} className="bg-sky-500 hover:bg-sky-600 text-white p-2 rounded-lg transition-colors"><PlusCircle size={20} /></button>
             </div>
 
-            {/* Check Mostrar Todos */}
             <label className="flex items-center space-x-3 bg-gray-700/50 p-3 rounded-xl border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all">
                 <input type="checkbox" checked={showAllRoutes} onChange={(e) => setShowAllRoutes(e.target.checked)} className="w-5 h-5 rounded text-sky-500 bg-gray-900 border-gray-600 focus:ring-0" />
                 <span className="text-sm font-bold text-gray-200 flex items-center gap-2">
@@ -62,14 +58,13 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
                 </span>
             </label>
 
-            {/* Filtros Desplegables con datos de la BD */}
             <div className="grid grid-cols-1 gap-2">
-                <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
+                <select value={filterGroup} onChange={(e) => { setFilterGroup(e.target.value); setFilterLine(''); setFilterService(''); }} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
                     <option value="">Todos los Grupos</option>
                     {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
                 <div className="grid grid-cols-2 gap-2">
-                    <select value={filterLine} onChange={(e) => setFilterLine(e.target.value)} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
+                    <select value={filterLine} onChange={(e) => { setFilterLine(e.target.value); setFilterService(''); }} className="bg-gray-800 text-white text-xs p-2 rounded border border-gray-600 outline-none focus:border-sky-500">
                         <option value="">Línea...</option>
                         {uniqueLines.map(l => <option key={l} value={l}>{l}</option>)}
                     </select>

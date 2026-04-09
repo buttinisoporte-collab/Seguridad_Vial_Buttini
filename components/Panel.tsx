@@ -31,15 +31,15 @@ interface PanelProps {
     riskViewerSelectedTypes: string[]; setRiskViewerSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
     togglePublicRoute: (id: string) => void; handleDeleteRisk: (id: string) => void;
     setFocusPosition: React.Dispatch<React.SetStateAction<Position | null>>;
-    showAllRoutes: boolean; 
-    setShowAllRoutes: (v: boolean) => void;
-    // 👇 PEGAR ESTO AQUÍ 👇
-    telegramToken: string;
-    setTelegramToken: (v: string) => void;
-    telegramChatId: string;
-    setTelegramChatId: (v: string) => void;
+    showAllRoutes: boolean; setShowAllRoutes: (v: boolean) => void;
+    telegramToken: string; setTelegramToken: (v: string) => void;
+    telegramChatId: string; setTelegramChatId: (v: string) => void;
     onUpdateRisk: (risk: Risk) => void;
-    
+    groupColors: Record<string, string>; setGroupColors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+    novedadesFilterDate: string; setNovedadesFilterDate: (v: string) => void;
+    novedadesFilterLine: string; setNovedadesFilterLine: (v: string) => void;
+    showNovedadesRoutes: boolean; setShowNovedadesRoutes: (v: boolean) => void;
+    selectedSiniestroId: string | null; setSelectedSiniestroId: (v: string | null) => void;
 }
 
 export const Panel: React.FC<PanelProps> = ({
@@ -47,18 +47,20 @@ export const Panel: React.FC<PanelProps> = ({
     proximityDistance, setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
-    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk
-    }) => {
+    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, groupColors, setGroupColors,
+    novedadesFilterDate, setNovedadesFilterDate, novedadesFilterLine, setNovedadesFilterLine, showNovedadesRoutes, setShowNovedadesRoutes,
+    selectedSiniestroId, setSelectedSiniestroId
+}) => {
 
     const renderTabContent = () => {
         switch (activeTab) {
             case 'routes': return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} isAdmin={currentUser.isAdmin} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes} />;
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} />;
-            case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} />;
-            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} handleDeleteSiniestro={handleDeleteSiniestro} />;
+            case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
+            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} handleDeleteSiniestro={handleDeleteSiniestro} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
-            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} />;
+            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
             default: return null;
         }
@@ -76,41 +78,28 @@ export const Panel: React.FC<PanelProps> = ({
         );
     };
 
-    const handleChangePass = () => {
-        const newPin = window.prompt("Ingrese su nueva contraseña:");
-        if (newPin && newPin.trim().length > 0) {
-            setUsers(users.map(u => u.id === currentUser.id ? { ...u, pin: newPin.trim() } : u));
-            alert("Contraseña actualizada. Use la nueva clave la próxima vez que inicie sesión.");
-        }
-    };
-
     return (
         <aside className="w-[420px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
                  <div className="flex items-center text-sky-400 mb-2" title={`Conectado como: ${currentUser.name}`}><Map size={32} /></div>
                 
+                {/* Nuevos Nombres de Pestañas */}
                 <TabButton tabName="routes" icon={<MapPin size={24} />} label="Recorridos" />
-                <TabButton tabName="riskTypes" icon={<AlertTriangle size={24} />} label="Cargar" />
+                <TabButton tabName="riskTypes" icon={<AlertTriangle size={24} />} label="Carga de Datos" />
                 <TabButton tabName="novedades" icon={<List size={24} />} label="Novedades" />
                 <TabButton tabName="siniestros" icon={<ShieldAlert size={24} />} label="Siniestros" />
-                <TabButton tabName="riskViewer" icon={<Layers size={24} />} label="Visor" />
-                <TabButton tabName="reports" icon={<FileBarChart size={24} />} label="Reportes" />
+                <TabButton tabName="riskViewer" icon={<Layers size={24} />} label="Mapa Riesgo" />
+                <TabButton tabName="reports" icon={<FileBarChart size={24} />} label="Riesgo por Servicio" />
                 <TabButton tabName="settings" icon={<SettingsIcon size={24} />} label="Ajustes" />
                 <TabButton tabName="users" icon={<Users size={24} />} label="Usuarios" />
 
                 <div className="flex-1"></div>
                 
-                {(!currentUser.isAdmin && !currentUser.isDriver) && (
-                    <button onClick={handleChangePass} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña">
-                        <Key size={20} />
-                        <span className="mt-1 text-center leading-tight">Clave</span>
-                    </button>
+                {!currentUser.isAdmin && !currentUser.isDriver && (
+                    <button onClick={() => { const p = window.prompt("Nueva contraseña:"); if(p) { setUsers(users.map(u => u.id===currentUser.id?{...u, pin: p}:u)); alert("Actualizada"); } }} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800"><Key size={20} /><span className="mt-1">Clave</span></button>
                 )}
 
-                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión">
-                    <LogOut size={24} />
-                    <span className="mt-1 text-center leading-tight">Salir</span>
-                </button>
+                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
         </aside>
