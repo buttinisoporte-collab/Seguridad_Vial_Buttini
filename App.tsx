@@ -81,22 +81,22 @@ const App: React.FC = () => {
     const[showIncidents, setShowIncidents] = useState(true);
     const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
-    const [filterService, setFilterService] = useState('');
+    const[filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
     
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
-    const [users, setUsers] = useState<User[]>([]);
+    const[users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
     const [risks, setRisks] = useState<Risk[]>([]);
-    const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
+    const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
-    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const[showAllRoutes, setShowAllRoutes] = useState(true); 
-    const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false); // NUEVO: Inicializado en false para Mapa de Riesgos
+    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const [showAllRoutes, setShowAllRoutes] = useState(true); 
+    const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
     const[telegramToken, setTelegramToken] = useState(() => localStorage.getItem('tg_token') || '');
@@ -138,17 +138,14 @@ const App: React.FC = () => {
                 setSiniestros(Array.isArray(dbSiniestros) ? dbSiniestros :[]); prevSiniestrosRef.current = Array.isArray(dbSiniestros) ? dbSiniestros :[];
 
                 if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { 
-                    if (!dbRiskTypes.find(rt => rt.id === 'incidente-ruta')) {
-                        const incType = { id: 'incidente-ruta', name: 'Incidente en Ruta', color: '#000000', isIncident: true };
-                        dbRiskTypes.push(incType); saveRiskTypeToDB(incType).catch(()=>{});
-                    }
-                    if (!dbRiskTypes.find(rt => rt.id === 'novedad-ruta')) {
-                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: true };
+                    // CORRECCIÓN: Si no hay categoría "Novedad en Ruta" que sea RIESGO (isIncident = false), la crea bien.
+                    if (!dbRiskTypes.find(rt => rt.name.toLowerCase() === 'novedad en ruta' && !rt.isIncident)) {
+                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }; // RIESGO, no siniestro
                         dbRiskTypes.push(novType); saveRiskTypeToDB(novType).catch(()=>{});
                     }
                     setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; 
                 } else {
-                    const defaultTypes: RiskType[] =[{ id: 'incidente-ruta', name: 'Incidente en Ruta', color: '#000000', isIncident: true }, { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: true }, { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false }, { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false }];
+                    const defaultTypes: RiskType[] =[{ id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }, { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false }, { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false }];
                     setRiskTypes(defaultTypes); defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{})); prevRiskTypesRef.current = defaultTypes;
                 }
 
@@ -279,7 +276,8 @@ const App: React.FC = () => {
     };
 
     const handleDriverSave = useCallback((newRisk: Risk) => {
-        const riskType = riskTypes.find(rt => rt.id === 'novedad-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
+        // CORRECCIÓN: Toma el tipo 'Novedad' que sea RIESGO (!isIncident) para evitar el conflicto.
+        const riskType = riskTypes.find(rt => rt.name.toLowerCase() === 'novedad en ruta' && !rt.isIncident) || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
         const finalizedRisk = { 
             ...newRisk, 
             riskTypeId: riskType?.id || '1', 
@@ -295,7 +293,7 @@ const App: React.FC = () => {
     const handleMapClick = useCallback((latlng: LatLng) => {
         const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); }
-    },[activeTab, currentUser]);
+    }, [activeTab, currentUser]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
@@ -361,33 +359,31 @@ const App: React.FC = () => {
     }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL, activeTab, novedadesFilterLine, novedadesFilterDate]);
 
     const visibleRoutes = useMemo(() => {
+        if (!showAllRoutes) return[]; 
         if (!Array.isArray(routes)) return[];
-        
         if (activeTab === 'routes') {
-            if (!showAllRoutes) return[];
             return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || (route.group||'').toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || (route.line||'').toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || (route.service||'').toLowerCase().includes(filterService.toLowerCase())));
-        } 
-        else if (activeTab === 'reports') { return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) :[]; } 
-        else if (activeTab === 'riskViewer') {
-            if (!showRiskViewerRoutes) return[]; // NUEVA CONDICION
+        } else if (activeTab === 'reports') {
+            return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) :[];
+        } else if (activeTab === 'riskViewer') {
+            if (!showRiskViewerRoutes) return[];
             const affectedRouteIds = new Set<string>();
             baseVisibleRisks.forEach(risk => { if (Array.isArray(riskViewerSelectedTypes) && riskViewerSelectedTypes.includes(risk.riskTypeId)) (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).forEach(id => affectedRouteIds.add(id)); });
-            return routes.filter(route => affectedRouteIds.has(route.id));
-        }
-        else if (activeTab === 'novedades') {
+            // SE APLICAN FILTROS DE LINEA Y SERVICIO EN EL VISOR DE RIESGOS
+            return routes.filter(route => affectedRouteIds.has(route.id) && (!filterLine || route.line === filterLine) && (!filterService || route.service === filterService));
+        } else if (activeTab === 'novedades') {
             if (!showNovedadesRoutes) return[];
             const affectedRouteIds = new Set<string>();
             baseVisibleRisks.forEach(risk => { (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).forEach(id => affectedRouteIds.add(id)); });
             return routes.filter(route => affectedRouteIds.has(route.id));
-        }
-        else if (activeTab === 'siniestros') {
+        } else if (activeTab === 'siniestros') {
             if (!selectedSiniestroId) return[];
             const sin = siniestros.find(s => s.id === selectedSiniestroId);
             if (!sin) return[];
             return routes.filter(r => r.line === sin.conductor.linea);
         }
         return routes;
-    },[routes, activeTab, filterGroup, filterLine, filterService, activeRouteId, reportSelectedRouteId, riskViewerSelectedTypes, baseVisibleRisks, showAllRoutes, showNovedadesRoutes, selectedSiniestroId, siniestros, showRiskViewerRoutes]); // AÑADIDO showRiskViewerRoutes
+    },[routes, activeTab, filterGroup, filterLine, filterService, activeRouteId, reportSelectedRouteId, riskViewerSelectedTypes, baseVisibleRisks, showAllRoutes, showNovedadesRoutes, selectedSiniestroId, siniestros, showRiskViewerRoutes]);
 
     const visibleRisks = useMemo(() => {
         if (activeTab === 'routes') { const visibleRouteIds = new Set(visibleRoutes.map(r => r.id)); return baseVisibleRisks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).some(id => visibleRouteIds.has(id))); }

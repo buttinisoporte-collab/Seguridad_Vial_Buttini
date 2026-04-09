@@ -10,13 +10,23 @@ interface RiskViewerProps {
     setSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
     showRiskViewerRoutes: boolean;
     setShowRiskViewerRoutes: (v: boolean) => void;
+    // NUEVOS FILTROS
+    filterLine: string;
+    setFilterLine: (v: string) => void;
+    filterService: string;
+    setFilterService: (v: string) => void;
 }
 
 export const RiskViewer: React.FC<RiskViewerProps> = ({ 
     riskTypes, risks, routes, selectedTypes, setSelectedTypes,
-    showRiskViewerRoutes, setShowRiskViewerRoutes
+    showRiskViewerRoutes, setShowRiskViewerRoutes,
+    filterLine, setFilterLine, filterService, setFilterService
 }) => {
     
+    // Obtener valores únicos para los desplegables
+    const uniqueLines = useMemo(() => Array.from(new Set(routes.map(r => r.line))).sort(), [routes]);
+    const uniqueServices = useMemo(() => Array.from(new Set(routes.filter(r => !filterLine || r.line === filterLine).map(r => r.service))).sort(), [routes, filterLine]);
+
     const handleToggle = (id: string) => {
         if (selectedTypes.includes(id)) {
             setSelectedTypes(selectedTypes.filter(t => t !== id));
@@ -25,7 +35,7 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
         }
     };
 
-    // Computar las rutas afectadas en base a los riesgos visibles
+    // Computar las rutas afectadas filtradas por línea y servicio
     const affectedRoutes = useMemo(() => {
         if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return[];
         const affectedIds = new Set<string>();
@@ -38,8 +48,12 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
             });
         }
         
-        return Array.isArray(routes) ? routes.filter(r => affectedIds.has(r.id)) :[];
-    },[risks, routes, selectedTypes]);
+        return Array.isArray(routes) ? routes.filter(route => 
+            affectedIds.has(route.id) &&
+            (!filterLine || route.line === filterLine) &&
+            (!filterService || route.service === filterService)
+        ).sort((a,b) => a.name.localeCompare(b.name)) :[];
+    },[risks, routes, selectedTypes, filterLine, filterService]);
 
     return (
         <div className="flex flex-col h-full">
@@ -53,10 +67,20 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
                 </span>
             </label>
 
-            <p className="text-xs text-gray-400 mb-4">Seleccione las categorías que desea aislar en el mapa para ver su impacto cruzado.</p>
-            
+            {/* NUEVOS FILTROS DESPLEGABLES */}
+            <div className="bg-gray-800 p-3 rounded-lg mb-4 flex gap-2 border border-gray-700 shadow-md">
+                <select value={filterLine} onChange={(e) => { setFilterLine(e.target.value); setFilterService(''); }} className="flex-1 bg-gray-900 text-white p-2 text-xs rounded border border-gray-600 outline-none focus:border-sky-500">
+                    <option value="">Todas las Líneas...</option>
+                    {uniqueLines.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <select value={filterService} onChange={(e) => setFilterService(e.target.value)} className="flex-1 bg-gray-900 text-white p-2 text-xs rounded border border-gray-600 outline-none focus:border-sky-500">
+                    <option value="">Todos los Servicios...</option>
+                    {uniqueServices.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+            </div>
+
             <div className="bg-gray-700 p-3 rounded-lg mb-4">
-                <h3 className="text-sm font-semibold text-white mb-2 border-b border-gray-600 pb-1">Categorías</h3>
+                <h3 className="text-sm font-semibold text-white mb-2 border-b border-gray-600 pb-1">Categorías de Análisis</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                     {Array.isArray(riskTypes) && riskTypes.map(rt => (
                         <label key={rt.id} className="flex items-center space-x-3 cursor-pointer p-1 rounded hover:bg-gray-600 transition-colors">
@@ -91,9 +115,7 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
                     ) : (
                         <div className="text-center py-6">
                             <Layers size={32} className="mx-auto text-gray-500 mb-2" />
-                            <p className="text-xs text-gray-400">
-                                {Array.isArray(selectedTypes) && selectedTypes.length === 0 ? "Seleccione categorías arriba para ver los recorridos afectados." : "No hay recorridos afectados por las categorías seleccionadas."}
-                            </p>
+                            <p className="text-xs text-gray-400">No hay recorridos afectados por las categorías y filtros seleccionados.</p>
                         </div>
                     )}
                 </div>
