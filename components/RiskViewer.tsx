@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { RiskType, Risk, Route } from '../types';
-import { Layers } from 'lucide-react';
+import { Layers, Eye, EyeOff } from 'lucide-react';
 
 interface RiskViewerProps {
     riskTypes: RiskType[];
@@ -8,10 +8,14 @@ interface RiskViewerProps {
     routes: Route[];
     selectedTypes: string[];
     setSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
+    showRiskViewerRoutes: boolean;
+    setShowRiskViewerRoutes: (v: boolean) => void;
 }
 
-// AQUÍ ESTÁ LA EXPORTACIÓN QUE VERCEL NO ENCONTRABA 👇
-export const RiskViewer: React.FC<RiskViewerProps> = ({ riskTypes, risks, routes, selectedTypes, setSelectedTypes }) => {
+export const RiskViewer: React.FC<RiskViewerProps> = ({ 
+    riskTypes, risks, routes, selectedTypes, setSelectedTypes,
+    showRiskViewerRoutes, setShowRiskViewerRoutes
+}) => {
     
     const handleToggle = (id: string) => {
         if (selectedTypes.includes(id)) {
@@ -21,7 +25,7 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({ riskTypes, risks, routes
         }
     };
 
-    // Computar las rutas afectadas en base a los riesgos visibles (Blindado)
+    // Computar las rutas afectadas en base a los riesgos visibles
     const affectedRoutes = useMemo(() => {
         if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return[];
         const affectedIds = new Set<string>();
@@ -35,11 +39,20 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({ riskTypes, risks, routes
         }
         
         return Array.isArray(routes) ? routes.filter(r => affectedIds.has(r.id)) :[];
-    }, [risks, routes, selectedTypes]);
+    },[risks, routes, selectedTypes]);
 
     return (
         <div className="flex flex-col h-full">
-            <h2 className="text-xl font-bold mb-4 text-sky-300">Visor de Riesgos Globales</h2>
+            <h2 className="text-xl font-bold mb-4 text-sky-300">Mapa Riesgo / Siniestralidad</h2>
+            
+            <label className="flex items-center space-x-3 bg-gray-700/50 p-3 rounded-xl border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all mb-4">
+                <input type="checkbox" checked={showRiskViewerRoutes} onChange={(e) => setShowRiskViewerRoutes(e.target.checked)} className="w-5 h-5 rounded text-sky-500 bg-gray-900 border-gray-600 focus:ring-0" />
+                <span className="text-sm font-bold text-gray-200 flex items-center gap-2">
+                    {showRiskViewerRoutes ? <Eye size={16} className="text-sky-400"/> : <EyeOff size={16} className="text-gray-500"/>}
+                    Ver recorridos afectados en el mapa
+                </span>
+            </label>
+
             <p className="text-xs text-gray-400 mb-4">Seleccione las categorías que desea aislar en el mapa para ver su impacto cruzado.</p>
             
             <div className="bg-gray-700 p-3 rounded-lg mb-4">
