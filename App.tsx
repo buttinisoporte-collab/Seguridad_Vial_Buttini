@@ -38,7 +38,7 @@ const MapFixer = () => {
 
 const MapFocusUpdater = ({ focusPosition }: { focusPosition: Position | null }) => {
     const map = useMap();
-    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); }, [focusPosition, map]);
+    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); },[focusPosition, map]);
     return null;
 };
 
@@ -81,20 +81,20 @@ const App: React.FC = () => {
     const[showIncidents, setShowIncidents] = useState(true);
     const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
-    const[filterService, setFilterService] = useState('');
+    const [filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
     
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
-    const[users, setUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
     const [risks, setRisks] = useState<Risk[]>([]);
-    const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
+    const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
-    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const [showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
@@ -138,14 +138,17 @@ const App: React.FC = () => {
                 setSiniestros(Array.isArray(dbSiniestros) ? dbSiniestros :[]); prevSiniestrosRef.current = Array.isArray(dbSiniestros) ? dbSiniestros :[];
 
                 if (Array.isArray(dbRiskTypes) && dbRiskTypes.length > 0) { 
-                    // CORRECCIÓN: Si no hay categoría "Novedad en Ruta" que sea RIESGO (isIncident = false), la crea bien.
-                    if (!dbRiskTypes.find(rt => rt.name.toLowerCase() === 'novedad en ruta' && !rt.isIncident)) {
-                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }; // RIESGO, no siniestro
+                    if (!dbRiskTypes.find(rt => rt.id === 'incidente-ruta')) {
+                        const incType = { id: 'incidente-ruta', name: 'Incidente en Ruta', color: '#000000', isIncident: true };
+                        dbRiskTypes.push(incType); saveRiskTypeToDB(incType).catch(()=>{});
+                    }
+                    if (!dbRiskTypes.find(rt => rt.id === 'novedad-ruta')) {
+                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }; // ES RIESGO (false)
                         dbRiskTypes.push(novType); saveRiskTypeToDB(novType).catch(()=>{});
                     }
                     setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; 
                 } else {
-                    const defaultTypes: RiskType[] =[{ id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }, { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false }, { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false }];
+                    const defaultTypes: RiskType[] =[{ id: 'incidente-ruta', name: 'Incidente en Ruta', color: '#000000', isIncident: true }, { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }, { id: '1', name: 'Escuela', color: '#3b82f6', isIncident: false }, { id: '2', name: 'Hospital', color: '#ef4444', isIncident: false }];
                     setRiskTypes(defaultTypes); defaultTypes.forEach(t => saveRiskTypeToDB(t).catch(()=>{})); prevRiskTypesRef.current = defaultTypes;
                 }
 
@@ -261,23 +264,53 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
+    // --- FUNCIÓN TELEGRAM (CORREGIDA CON HTML PARA EVITAR ERRORES) ---
     const sendTelegramNotification = async (risk: Risk) => {
-        if (!telegramToken || !telegramChatId) return;
+        if (!telegramToken || !telegramChatId) {
+            console.warn("⚠️ Telegram no configurado en Ajustes.");
+            return;
+        }
         const d = risk.driverReportDetails; if (!d) return;
 
-        const message = `🚨 *NUEVA NOVEDAD EN RUTA* 🚨\n---------------------------\n👤 *Conductor:* ${d.conductorName}\n🚌 *Unidad:* ${d.unidad}\n🛣️ *Línea:* ${d.linea}\n⚠️ *Tipo:* ${d.categoriaIRAM}\n🔄 *Sentido:* ${d.sentido}\n🚧 *¿Desvío?:* ${d.huboDesvio ? 'SÍ' : 'NO'}\n📍 *Ubicación:* ${d.ubicacionManual || 'Coordenadas GPS'}\n📝 *Detalles:* ${risk.description || 'Sin observaciones'}\n---------------------------\n📌 [Ver en el Mapa](${window.location.origin}/?publicRoute=${risk.associatedRouteIds?.[0] || 'default'})`.trim();
+        // Limpiador para que símbolos ( ) - . no rompan la API de Telegram
+        const safeText = (text?: string) => text ? text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;') : '';
+
+        const message = `
+🚨 <b>NUEVA NOVEDAD EN RUTA</b> 🚨
+---------------------------
+👤 <b>Conductor:</b> ${safeText(d.conductorName)}
+🚌 <b>Unidad:</b> ${safeText(d.unidad)}
+🛣️ <b>Línea:</b> ${safeText(d.linea)}
+⚠️ <b>Tipo:</b> ${safeText(d.categoriaIRAM)}
+🔄 <b>Sentido:</b> ${safeText(d.sentido)}
+🚧 <b>¿Desvío?:</b> ${d.huboDesvio ? 'SÍ' : 'NO'}
+📍 <b>Ubicación:</b> ${safeText(d.ubicacionManual) || 'Coordenadas GPS'}
+
+📝 <b>Detalles:</b> ${safeText(risk.description) || 'Sin observaciones'}
+---------------------------
+📌 <a href="${window.location.origin}/?publicRoute=${risk.associatedRouteIds?.[0] || 'default'}">Ver en el Mapa de Riesgo</a>
+        `.trim();
 
         try {
-            await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: telegramChatId, text: message, parse_mode: 'Markdown' })
+            const response = await fetch(`https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    chat_id: telegramChatId.trim(), 
+                    text: message, 
+                    parse_mode: 'HTML' // Fundamental
+                })
             });
-        } catch (e) { console.error("Error enviando Telegram", e); }
+            const data = await response.json();
+            if (!response.ok) {
+                console.error("Error API Telegram:", data);
+                alert(`Error al enviar Telegram: ${data.description}`);
+            }
+        } catch (e) { console.error("Error de Red enviando Telegram", e); }
     };
 
     const handleDriverSave = useCallback((newRisk: Risk) => {
-        // CORRECCIÓN: Toma el tipo 'Novedad' que sea RIESGO (!isIncident) para evitar el conflicto.
-        const riskType = riskTypes.find(rt => rt.name.toLowerCase() === 'novedad en ruta' && !rt.isIncident) || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
+        const riskType = riskTypes.find(rt => rt.id === 'novedad-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
         const finalizedRisk = { 
             ...newRisk, 
             riskTypeId: riskType?.id || '1', 
@@ -287,13 +320,14 @@ const App: React.FC = () => {
         setRisks(prev =>[...prev, finalizedRisk]);
         sendTelegramNotification(finalizedRisk);
     },[riskTypes, findAssociatedRouteIds, telegramToken, telegramChatId]);
+    // -----------------------------------------------------------------
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
     const handleMapClick = useCallback((latlng: LatLng) => {
         const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); }
-    }, [activeTab, currentUser]);
+    },[activeTab, currentUser]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
@@ -369,8 +403,7 @@ const App: React.FC = () => {
             if (!showRiskViewerRoutes) return[];
             const affectedRouteIds = new Set<string>();
             baseVisibleRisks.forEach(risk => { if (Array.isArray(riskViewerSelectedTypes) && riskViewerSelectedTypes.includes(risk.riskTypeId)) (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).forEach(id => affectedRouteIds.add(id)); });
-            // SE APLICAN FILTROS DE LINEA Y SERVICIO EN EL VISOR DE RIESGOS
-            return routes.filter(route => affectedRouteIds.has(route.id) && (!filterLine || route.line === filterLine) && (!filterService || route.service === filterService));
+            return routes.filter(route => affectedRouteIds.has(route.id));
         } else if (activeTab === 'novedades') {
             if (!showNovedadesRoutes) return[];
             const affectedRouteIds = new Set<string>();
@@ -393,7 +426,7 @@ const App: React.FC = () => {
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
     if (isSiniestroMode) {
-        return <SiniestroForm onSaveSiniestro={async (sin) => { setSiniestros(prev => [...prev, sin]); await saveSiniestroToDB(sin); }} />;
+        return <SiniestroForm onSaveSiniestro={async (sin) => { setSiniestros(prev =>[...prev, sin]); await saveSiniestroToDB(sin); }} />;
     }
 
     if (isDriverMode) {
