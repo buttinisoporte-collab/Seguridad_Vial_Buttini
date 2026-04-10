@@ -15,7 +15,8 @@ interface PanelProps {
     riskTypes: RiskType[]; setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
     routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
     risks: Risk[]; setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
-    siniestros: Siniestro[]; handleDeleteSiniestro: (id: string) => void;
+    siniestros: Siniestro[]; incidentRisks: Risk[]; // NUEVA PROP incidentRisks
+    handleDeleteSiniestro: (id: string) => void;
     proximityDistance: number; setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
     driverReportTTL: number; setDriverReportTTL: React.Dispatch<React.SetStateAction<number>>;
     onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
@@ -44,7 +45,7 @@ interface PanelProps {
 }
 
 export const Panel: React.FC<PanelProps> = ({
-    currentUser, onLogout, users, setUsers, riskTypes, setRiskTypes, routes, setRoutes, risks, setRisks, siniestros, handleDeleteSiniestro,
+    currentUser, onLogout, users, setUsers, riskTypes, setRiskTypes, routes, setRoutes, risks, setRisks, siniestros, incidentRisks, handleDeleteSiniestro,
     proximityDistance, setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
@@ -59,7 +60,7 @@ export const Panel: React.FC<PanelProps> = ({
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} />;
             case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
-            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} handleDeleteSiniestro={handleDeleteSiniestro} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} />;
+            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
             case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
@@ -99,7 +100,7 @@ export const Panel: React.FC<PanelProps> = ({
                     <button onClick={() => { const p = window.prompt("Nueva contraseña:"); if(p) { setUsers(users.map(u => u.id===currentUser.id?{...u, pin: p}:u)); alert("Actualizada"); } }} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña"><Key size={20} /><span className="mt-1 text-center leading-tight">Clave</span></button>
                 )}
 
-                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
+                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
         </aside>

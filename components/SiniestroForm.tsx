@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { ShieldAlert, MapPin, Camera, CheckCircle, ExternalLink, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ShieldAlert, MapPin, Camera, CheckCircle, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { Siniestro, Consecuencia } from '../types';
 import { uploadSiniestroImage } from '../lib/firebase';
 
@@ -19,7 +19,7 @@ const CONSECUENCIAS_DEFAULT: Consecuencia[] =[
 export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro }) => {
     const [step, setStep] = useState(1);
     const[isSubmitting, setIsSubmitting] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState("");
+    const[uploadProgress, setUploadProgress] = useState("");
     const[gpsPosition, setGpsPosition] = useState<{lat: number, lng: number}|null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
@@ -42,7 +42,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
     },[]);
 
     const handleChange = (e: any) => setF({ ...f, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev =>[...prev, ...Array.from(e.target.files!)]); };
     const removeFile = (index: number) => setSelectedFiles(prev => prev.filter((_, i) => i !== index));
 
     const toggleArray = (arrayName: 'climas' | 'caminos', item: string) => {
@@ -106,7 +106,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
             </div>
 
             <div className="p-4 space-y-6 max-w-md mx-auto">
-                {/* SECCION 1 */}
+                {/* 1. INFO GENERAL */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">1. Información General</h2>
                     <div className="space-y-3">
@@ -141,7 +141,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     </div>
                 </div>
 
-                {/* SECCION 2 */}
+                {/* 2. CONDUCTOR */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">2. Conductor y Unidad</h2>
                     <div className="space-y-3">
@@ -154,7 +154,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     </div>
                 </div>
 
-                {/* SECCION 3 */}
+                {/* 3. DESCRIPCION */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">3. Descripción</h2>
                     <select name="descTipo" value={f.descTipo} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 mb-3 text-sm">
@@ -187,55 +187,63 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     </select>
                 </div>
 
-                {/* SECCION 4 */}
-                <div className="bg-blue-900/30 p-4 rounded-xl border border-blue-500/50 shadow-md">
-                    <h2 className="font-bold text-blue-400 mb-3 border-b border-blue-500/30 pb-1 uppercase text-xs tracking-wider">4. Formulario de Deslinde de Atención Médica</h2>
-                    <p className="text-[11px] text-blue-200/70 mb-4">Si el pasajero o tercero manifiesta no requerir atención médica inmediata, debe completar el siguiente formulario digital.</p>
-                    <a href="https://deslinde-responsabilidad.vercel.app/" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg">Acceder al Formulario <ExternalLink size={18} /></a>
-                </div>
-
-                {/* SECCION 5 */}
+                {/* 4. DATOS COMPLEMENTARIOS (AHORA EL 4) */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">5. Datos Complementarios</h2>
-                    <div className="space-y-3">
-                        <input type="text" name="tercNombre" value={f.tercNombre} onChange={handleChange} placeholder="Nombre del Tercero (Opcional)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
-                        <div className="grid grid-cols-2 gap-3">
-                            <input type="text" name="tercVehiculo" value={f.tercVehiculo} onChange={handleChange} placeholder="Marca/Modelo" className="bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
-                            <input type="text" name="tercPatente" value={f.tercPatente} onChange={handleChange} placeholder="Patente" className="bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
-                        </div>
-                        <input type="text" name="tercSeguro" value={f.tercSeguro} onChange={handleChange} placeholder="Compañía de Seguro" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
-                        
-                        <div className="pt-3 border-t border-gray-700 space-y-3">
-                            <label className="flex items-center gap-3 bg-gray-900 p-3 rounded border border-gray-600">
-                                <input type="checkbox" name="intervencionPolicial" checked={f.intervencionPolicial} onChange={handleChange} className="w-5 h-5 rounded bg-gray-800 border-gray-600 text-sky-500 focus:ring-0" />
-                                <span className="text-sm">Intervención Policial</span>
-                            </label>
-                            
-                            <label className="flex items-center gap-3 bg-gray-900 p-3 rounded border border-gray-600">
-                                <input type="checkbox" name="hayTestigos" checked={f.hayTestigos} onChange={handleChange} className="w-5 h-5 rounded bg-gray-800 border-gray-600 text-sky-500 focus:ring-0" />
-                                <span className="text-sm">Testigos Disponibles</span>
-                            </label>
-                            {f.hayTestigos && (
-                                <textarea name="testigosInfo" value={f.testigosInfo} onChange={handleChange} placeholder="Nombre y contacto de los testigos..." rows={2} className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm outline-none focus:border-sky-500 animate-in fade-in"></textarea>
-                            )}
-                        </div>
+                    <div className="flex justify-between items-center mb-3 border-b border-gray-700 pb-1">
+                        <h2 className="font-bold text-sky-400 uppercase text-xs tracking-wider">4. Datos Complementarios</h2>
+                        <input type="checkbox" name="tercInvolucrado" checked={f.tercInvolucrado} onChange={handleChange} className="w-6 h-6 rounded bg-gray-900 border-gray-600 text-sky-500 focus:ring-0" />
                     </div>
+                    {f.tercInvolucrado && (
+                        <div className="space-y-3 animate-in fade-in duration-300">
+                            <input type="text" name="tercNombre" value={f.tercNombre} onChange={handleChange} placeholder="Nombre del Tercero (Opcional)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
+                            <div className="grid grid-cols-2 gap-3">
+                                <input type="text" name="tercVehiculo" value={f.tercVehiculo} onChange={handleChange} placeholder="Marca/Modelo" className="bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
+                                <input type="text" name="tercPatente" value={f.tercPatente} onChange={handleChange} placeholder="Patente" className="bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
+                            </div>
+                            <input type="text" name="tercSeguro" value={f.tercSeguro} onChange={handleChange} placeholder="Compañía de Seguro" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
+                            
+                            <div className="pt-3 border-t border-gray-700 space-y-3">
+                                <label className="flex items-center gap-3 bg-gray-900 p-3 rounded border border-gray-600">
+                                    <input type="checkbox" name="intervencionPolicial" checked={f.intervencionPolicial} onChange={handleChange} className="w-5 h-5 rounded bg-gray-800 border-gray-600 text-sky-500 focus:ring-0" />
+                                    <span className="text-sm">Intervención Policial</span>
+                                </label>
+                                
+                                <label className="flex items-center gap-3 bg-gray-900 p-3 rounded border border-gray-600">
+                                    <input type="checkbox" name="hayTestigos" checked={f.hayTestigos} onChange={handleChange} className="w-5 h-5 rounded bg-gray-800 border-gray-600 text-sky-500 focus:ring-0" />
+                                    <span className="text-sm">Testigos Disponibles</span>
+                                </label>
+                                {f.hayTestigos && (
+                                    <textarea name="testigosInfo" value={f.testigosInfo} onChange={handleChange} placeholder="Nombre y contacto de los testigos..." rows={2} className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm outline-none focus:border-sky-500 animate-in fade-in"></textarea>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* SECCION 6 */}
+                {/* 5. FOTOGRAFIAS (AHORA EL 5) */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">6. Fotografías del Hecho</h2>
+                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">5. Fotografías del Hecho</h2>
                     <p className="text-[11px] text-gray-400 mb-4 italic">Suba fotos de: daños propios, daños terceros, posición de vehículos (TOME FOTOS PANORÁMICAS) y documentos (TOME FOTOS ENFOCADAS Y CLARAS).</p>
+                    
                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors bg-gray-900/50">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6"><Camera size={32} className="text-sky-500 mb-2" /><p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p></div>
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <Camera size={32} className="text-sky-500 mb-2" />
+                            <p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p>
+                        </div>
                         <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileSelect} />
                     </label>
+
                     {selectedFiles.length > 0 && (
                         <div className="mt-4 grid grid-cols-2 gap-2">
                             {selectedFiles.map((file, index) => (
                                 <div key={index} className="relative bg-gray-900 p-2 rounded border border-gray-700 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 overflow-hidden"><ImageIcon size={14} className="text-gray-500 flex-shrink-0" /><span className="text-[10px] truncate text-gray-300">{file.name}</span></div>
-                                    <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-400 p-1"><Trash2 size={14} /></button>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <ImageIcon size={14} className="text-gray-500 flex-shrink-0" />
+                                        <span className="text-[10px] truncate text-gray-300">{file.name}</span>
+                                    </div>
+                                    <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-400 p-1">
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -248,7 +256,11 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                 </div>
 
                 <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-50">
-                    <button type="submit" disabled={isSubmitting} className={`w-full ${isSubmitting ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-500'} text-white font-bold text-lg py-4 rounded-xl shadow-lg flex flex-col items-center justify-center transition-all active:scale-95`}>
+                    <button 
+                        type="submit" 
+                        disabled={isSubmitting} 
+                        className={`w-full ${isSubmitting ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-500'} text-white font-bold text-lg py-4 rounded-xl shadow-lg flex flex-col items-center justify-center transition-all active:scale-95`}
+                    >
                         <span>{isSubmitting ? 'PROCESANDO...' : 'REGISTRAR SINIESTRO'}</span>
                         {isSubmitting && <span className="text-[10px] font-normal animate-pulse">{uploadProgress}</span>}
                     </button>

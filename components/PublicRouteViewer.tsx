@@ -29,10 +29,16 @@ const createRiskIcon = (color: string) => {
     return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(iconHtml)}`, iconSize:[30, 30], iconAnchor:[15, 30], popupAnchor:[0, -30] });
 };
 
-export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskTypes: RiskType[] }> = ({ route, risks, riskTypes }) => {
+export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskTypes: RiskType[], groupColors: Record<string, string> }> = ({ route, risks, riskTypes, groupColors }) => {
     const path: LatLngExpression[] =[];
     if (route.geoJson?.features) {
-        route.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString') f.geometry.coordinates.forEach(([lng, lat]) => path.push([lat, lng])); });
+        route.geoJson.features.forEach(f => { 
+            if (f?.geometry?.type === 'LineString') {
+                f.geometry.coordinates.forEach(c => {
+                    if(Array.isArray(c) && c.length >= 2) path.push([c[1], c[0]]);
+                });
+            } 
+        });
     }
 
     const safeRisks = risks.filter(risk => {
@@ -40,10 +46,7 @@ export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskType
         return type && !type.isIncident; 
     });
 
-    // LÓGICA DE COLOR PARA GRUPOS 540 Y 570
-    let routeColor = "#38bdf8"; // Celeste por defecto
-    if (route.group && route.group.includes('540')) routeColor = "#ef4444"; // Rojo (Tailwind red-500)
-    else if (route.group && route.group.includes('570')) routeColor = "#3b82f6"; // Azul oscuro (Tailwind blue-500)
+    let routeColor = groupColors[route.group] || "#0284c7";
 
     return (
         <div className="h-screen w-screen relative overflow-hidden">
@@ -65,7 +68,6 @@ export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskType
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <UserLocation />
                 
-                {/* Aplicamos el color dinámico */}
                 <Polyline positions={path} color={routeColor} weight={6} opacity={0.8} lineJoin="round" />
                 
                 {safeRisks.map(risk => {
@@ -73,7 +75,8 @@ export const PublicRouteViewer: React.FC<{ route: Route, risks: Risk[], riskType
                     if (!rt) return null;
                     return (
                         <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={createRiskIcon(rt.color)}>
-                            <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border-0 shadow-lg font-bold text-[10px] py-1 px-2 rounded-full">{rt.name}</Tooltip>
+                            {/* TOOLTIP PERMANENTE SIN CONDICIONES */}
+                            <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{rt.name}</Tooltip>
                             <Popup className="custom-popup">
                                 <div className="p-1 max-w-[200px]">
                                     <p className="font-bold text-sky-600 mb-1">{rt.name}</p>
