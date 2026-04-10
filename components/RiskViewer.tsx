@@ -10,7 +10,6 @@ interface RiskViewerProps {
     setSelectedTypes: React.Dispatch<React.SetStateAction<string[]>>;
     showRiskViewerRoutes: boolean;
     setShowRiskViewerRoutes: (v: boolean) => void;
-    // NUEVOS FILTROS
     filterLine: string;
     setFilterLine: (v: string) => void;
     filterService: string;
@@ -23,19 +22,15 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
     filterLine, setFilterLine, filterService, setFilterService
 }) => {
     
-    // Obtener valores únicos para los desplegables
-    const uniqueLines = useMemo(() => Array.from(new Set(routes.map(r => r.line))).sort(), [routes]);
-    const uniqueServices = useMemo(() => Array.from(new Set(routes.filter(r => !filterLine || r.line === filterLine).map(r => r.service))).sort(), [routes, filterLine]);
+    // Filtros seguros (evita errores si alguna ruta no tiene línea)
+    const uniqueLines = useMemo(() => Array.from(new Set(Array.isArray(routes) ? routes.filter(r => r && r.line).map(r => r.line) : [])).sort(), [routes]);
+    const uniqueServices = useMemo(() => Array.from(new Set(Array.isArray(routes) ? routes.filter(r => r && r.service && (!filterLine || r.line === filterLine)).map(r => r.service) : [])).sort(), [routes, filterLine]);
 
     const handleToggle = (id: string) => {
-        if (selectedTypes.includes(id)) {
-            setSelectedTypes(selectedTypes.filter(t => t !== id));
-        } else {
-            setSelectedTypes([...selectedTypes, id]);
-        }
+        if (selectedTypes.includes(id)) setSelectedTypes(selectedTypes.filter(t => t !== id));
+        else setSelectedTypes([...selectedTypes, id]);
     };
 
-    // Computar las rutas afectadas filtradas por línea y servicio
     const affectedRoutes = useMemo(() => {
         if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return[];
         const affectedIds = new Set<string>();
@@ -52,7 +47,7 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
             affectedIds.has(route.id) &&
             (!filterLine || route.line === filterLine) &&
             (!filterService || route.service === filterService)
-        ).sort((a,b) => a.name.localeCompare(b.name)) :[];
+        ).sort((a,b) => a.name.localeCompare(b.name)) : [];
     },[risks, routes, selectedTypes, filterLine, filterService]);
 
     return (
@@ -67,7 +62,6 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
                 </span>
             </label>
 
-            {/* NUEVOS FILTROS DESPLEGABLES */}
             <div className="bg-gray-800 p-3 rounded-lg mb-4 flex gap-2 border border-gray-700 shadow-md">
                 <select value={filterLine} onChange={(e) => { setFilterLine(e.target.value); setFilterService(''); }} className="flex-1 bg-gray-900 text-white p-2 text-xs rounded border border-gray-600 outline-none focus:border-sky-500">
                     <option value="">Todas las Líneas...</option>
@@ -84,12 +78,7 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                     {Array.isArray(riskTypes) && riskTypes.map(rt => (
                         <label key={rt.id} className="flex items-center space-x-3 cursor-pointer p-1 rounded hover:bg-gray-600 transition-colors">
-                            <input 
-                                type="checkbox" 
-                                checked={Array.isArray(selectedTypes) && selectedTypes.includes(rt.id)} 
-                                onChange={() => handleToggle(rt.id)} 
-                                className="rounded border-gray-500 focus:ring-sky-500 w-4 h-4 bg-gray-800 text-sky-500" 
-                            />
+                            <input type="checkbox" checked={Array.isArray(selectedTypes) && selectedTypes.includes(rt.id)} onChange={() => handleToggle(rt.id)} className="rounded border-gray-500 focus:ring-sky-500 w-4 h-4 bg-gray-800 text-sky-500" />
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: rt.color }}></div>
                             <span className="text-sm text-gray-200 flex-1">{rt.name}</span>
                             <span className="text-[9px] uppercase font-bold text-gray-500">{rt.isIncident ? 'Siniestro' : 'Riesgo'}</span>
@@ -115,7 +104,7 @@ export const RiskViewer: React.FC<RiskViewerProps> = ({
                     ) : (
                         <div className="text-center py-6">
                             <Layers size={32} className="mx-auto text-gray-500 mb-2" />
-                            <p className="text-xs text-gray-400">No hay recorridos afectados por las categorías y filtros seleccionados.</p>
+                            <p className="text-xs text-gray-400">No hay recorridos afectados para estos filtros.</p>
                         </div>
                     )}
                 </div>

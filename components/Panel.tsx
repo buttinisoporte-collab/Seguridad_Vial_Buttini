@@ -79,14 +79,6 @@ export const Panel: React.FC<PanelProps> = ({
         );
     };
 
-    const handleChangePass = () => {
-        const newPin = window.prompt("Ingrese su nueva contraseña:");
-        if (newPin && newPin.trim().length > 0) {
-            setUsers(users.map(u => u.id === currentUser.id ? { ...u, pin: newPin.trim() } : u));
-            alert("Contraseña actualizada. Use la nueva clave la próxima vez que inicie sesión.");
-        }
-    };
-
     return (
         <aside className="w-[420px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
@@ -104,16 +96,10 @@ export const Panel: React.FC<PanelProps> = ({
                 <div className="flex-1"></div>
                 
                 {!currentUser.isAdmin && !currentUser.isDriver && (
-                    <button onClick={handleChangePass} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña">
-                        <Key size={20} />
-                        <span className="mt-1 text-center leading-tight">Clave</span>
-                    </button>
+                    <button onClick={() => { const p = window.prompt("Nueva contraseña:"); if(p) { setUsers(users.map(u => u.id===currentUser.id?{...u, pin: p}:u)); alert("Actualizada"); } }} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña"><Key size={20} /><span className="mt-1 text-center leading-tight">Clave</span></button>
                 )}
 
-                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión">
-                    <LogOut size={24} />
-                    <span className="mt-1 text-center leading-tight">Salir</span>
-                </button>
+                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
         </aside>
