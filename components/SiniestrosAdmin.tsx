@@ -16,14 +16,14 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
     siniestros, incidentRisks, riskTypes, handleDeleteSiniestro, handleDeleteRisk, selectedSiniestroId, setSelectedSiniestroId 
 }) => {
     
-    // Unificar y ordenar ambas listas (IRAM y Manuales)
+    // Unificar y ordenar ambas listas (IRAM y Manuales del Mapa)
     const unifiedList = useMemo(() => {
         const list =[
             ...siniestros.map(s => ({ type: 'iram', data: s as any, ts: s.timestamp })),
             ...incidentRisks.map(r => ({ type: 'manual', data: r as any, ts: r.timestamp || 0 }))
         ];
         return list.sort((a, b) => b.ts - a.ts);
-    }, [siniestros, incidentRisks]);
+    },[siniestros, incidentRisks]);
 
     return (
         <div className="h-full flex flex-col">

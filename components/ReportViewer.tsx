@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Route, Risk, RiskType } from '../types';
 import { FileBarChart } from 'lucide-react';
-import { nearestPointOnLine, point } from '@turf/turf';
+import * as turf from '@turf/turf'; // SOLUCIÓN ESBUILD
 
 interface ReportViewerProps {
     routes: Route[]; risks: Risk[]; getRiskType: (id: string) => RiskType | undefined;
@@ -16,7 +16,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRi
     const uniqueLines = useMemo(() => Array.from(new Set(routes.filter(r => !filterGroup || r.group === filterGroup).map(r => r.line))).sort(), [routes, filterGroup]);
     const filteredDropdownRoutes = useMemo(() => routes.filter(r => (!filterGroup || r.group === filterGroup) && (!filterLine || r.line === filterLine)).sort((a,b)=>a.name.localeCompare(b.name)), [routes, filterGroup, filterLine]);
 
-    const selectedRoute = useMemo(() => Array.isArray(routes) ? routes.find(r => r.id === selectedRouteId) : null, [selectedRouteId, routes]);
+    const selectedRoute = useMemo(() => Array.isArray(routes) ? routes.find(r => r.id === selectedRouteId) : null,[selectedRouteId, routes]);
     const sortedSelectedRouteRisks = useMemo(() => {
         if (!selectedRouteId || !selectedRoute || !Array.isArray(risks)) return[];
         const unsortedRisks = risks.filter(risk => Array.isArray(risk.associatedRouteIds) && risk.associatedRouteIds.includes(selectedRouteId));
@@ -29,8 +29,10 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ routes, risks, getRi
         return[...unsortedRisks].sort((a, b) => {
             try {
                 if(!a.position || !b.position) return 0;
-                const ptA = point([a.position.lng, a.position.lat]); const ptB = point([b.position.lng, b.position.lat]);
-                const snappedA = nearestPointOnLine(referenceLine!, ptA); const snappedB = nearestPointOnLine(referenceLine!, ptB);
+                const ptA = turf.point([a.position.lng, a.position.lat]); 
+                const ptB = turf.point([b.position.lng, b.position.lat]);
+                const snappedA = turf.nearestPointOnLine(referenceLine!, ptA); 
+                const snappedB = turf.nearestPointOnLine(referenceLine!, ptB);
                 return (snappedA.properties?.location || 0) - (snappedB.properties?.location || 0);
             } catch (e) { return 0; }
         });

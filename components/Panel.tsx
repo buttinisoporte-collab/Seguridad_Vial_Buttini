@@ -15,7 +15,7 @@ interface PanelProps {
     riskTypes: RiskType[]; setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
     routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
     risks: Risk[]; setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
-    siniestros: Siniestro[]; incidentRisks: Risk[]; // NUEVA PROP incidentRisks
+    siniestros: Siniestro[]; incidentRisks: Risk[]; // RECIBE RIESGOS MANUALES QUE SON SINIESTROS
     handleDeleteSiniestro: (id: string) => void;
     proximityDistance: number; setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
     driverReportTTL: number; setDriverReportTTL: React.Dispatch<React.SetStateAction<number>>;
@@ -68,12 +68,11 @@ export const Panel: React.FC<PanelProps> = ({
         }
     };
     
-    const TabButton: React.FC<{ tabName: AppTab; icon: React.ReactNode; label: string }> = ({ tabName, icon, label }) => {
+    const renderTabButton = (tabName: AppTab, icon: React.ReactNode, label: string) => {
         if (!currentUser.isAdmin && !(currentUser.allowedTabs||[]).includes(tabName) && tabName !== 'users') return null;
         if (tabName === 'users' && !currentUser.isAdmin) return null; 
-
         return (
-            <button onClick={() => setActiveTab(tabName)} className={`flex flex-col items-center justify-center p-2 w-full text-xs transition-colors duration-200 ${activeTab === tabName ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-sky-800 hover:text-white'}`} title={label}>
+            <button key={tabName} onClick={() => setActiveTab(tabName)} className={`flex flex-col items-center justify-center p-2 w-full text-xs transition-colors duration-200 ${activeTab === tabName ? 'bg-sky-600 text-white' : 'text-gray-300 hover:bg-sky-800 hover:text-white'}`} title={label}>
                 {icon}
                 <span className="mt-1 text-center leading-tight">{label}</span>
             </button>
@@ -85,14 +84,14 @@ export const Panel: React.FC<PanelProps> = ({
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
                  <div className="flex items-center text-sky-400 mb-2" title={`Conectado como: ${currentUser.name}`}><Map size={32} /></div>
                 
-                <TabButton tabName="routes" icon={<MapPin size={24} />} label="Recorridos" />
-                <TabButton tabName="riskTypes" icon={<AlertTriangle size={24} />} label="Carga de Datos" />
-                <TabButton tabName="novedades" icon={<List size={24} />} label="Novedades" />
-                <TabButton tabName="siniestros" icon={<ShieldAlert size={24} />} label="Siniestros" />
-                <TabButton tabName="riskViewer" icon={<Layers size={24} />} label="Mapa Riesgo" />
-                <TabButton tabName="reports" icon={<FileBarChart size={24} />} label="Riesgo por Servicio" />
-                <TabButton tabName="settings" icon={<SettingsIcon size={24} />} label="Ajustes" />
-                <TabButton tabName="users" icon={<Users size={24} />} label="Usuarios" />
+                {renderTabButton('routes', <MapPin size={24} />, 'Recorridos')}
+                {renderTabButton('riskTypes', <AlertTriangle size={24} />, 'Carga de Datos')}
+                {renderTabButton('novedades', <List size={24} />, 'Novedades')}
+                {renderTabButton('siniestros', <ShieldAlert size={24} />, 'Siniestros')}
+                {renderTabButton('riskViewer', <Layers size={24} />, 'Mapa Riesgo')}
+                {renderTabButton('reports', <FileBarChart size={24} />, 'Riesgo por Servicio')}
+                {renderTabButton('settings', <SettingsIcon size={24} />, 'Ajustes')}
+                {renderTabButton('users', <Users size={24} />, 'Usuarios')}
 
                 <div className="flex-1"></div>
                 
@@ -100,7 +99,7 @@ export const Panel: React.FC<PanelProps> = ({
                     <button onClick={() => { const p = window.prompt("Nueva contraseña:"); if(p) { setUsers(users.map(u => u.id===currentUser.id?{...u, pin: p}:u)); alert("Actualizada"); } }} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña"><Key size={20} /><span className="mt-1 text-center leading-tight">Clave</span></button>
                 )}
 
-                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
+                <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
         </aside>
