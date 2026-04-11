@@ -16,9 +16,10 @@ const CATEGORIAS_IRAM =[
     { id: 'senalizacion', name: 'Señalización/Semáforo', desc: 'Apagado, tapada', icon: <Zap size={32}/>, color: '#eab308' },
     { id: 'desvio', name: 'Corte/Desvío', desc: 'Obra, evento, accidente', icon: <Navigation size={32}/>, color: '#8b5cf6' },
     { id: 'riesgo', name: 'Punto de Riesgo', desc: 'Agua, baja visibilidad, animales', icon: <AlertTriangle size={32}/>, color: '#3b82f6' },
-    // NUEVA CATEGORÍA AÑADIDA 👇
     { id: 'pasajeros', name: 'Problemática Pasajeros', desc: 'Falta de pago, agresión, menores, etc.', icon: <Users size={32}/>, color: '#ec4899' },
 ];
+
+const UNIDADES_HABILITADAS = Array.from({length: 150}, (_, i) => (i + 1).toString().padStart(3, '0'));
 
 export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onSaveReport, onLogout }) => {
     const[step, setStep] = useState<1 | 2 | 3>(1);
@@ -60,7 +61,7 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
         const newRisk: Risk = {
             id: uuidv4(),
             position: gpsPosition || { lat: -34.6175, lng: -68.335 },
-            riskTypeId: 'incidente-ruta', // Siempre fuerza el tipo negro por defecto para novedades
+            riskTypeId: 'incidente-ruta',
             description: observaciones || `Reporte IRAM: ${categoria.name}`,
             associatedRouteIds:[], images:[], driverReportDetails: driverDetails,
             timestamp: Date.now()
@@ -113,11 +114,12 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                         <label className="block text-xs text-gray-400 mb-1">Unidad N°</label>
-                        <input type="text" required value={unidad} onChange={e=>setUnidad(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Ej: 142" />
+                        <input list="unidades-list" type="text" required value={unidad} onChange={e=>setUnidad(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none text-white" placeholder="Buscar..." />
+                        <datalist id="unidades-list">{UNIDADES_HABILITADAS.map(u => <option key={u} value={u} />)}</datalist>
                     </div>
                     <div>
-                        <label className="block text-xs text-gray-400 mb-1">Línea/Servicio</label>
-                        <input list="lineas-list" type="text" required value={linea} onChange={e=>setLinea(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Buscar..." />
+                        <label className="block text-xs text-gray-400 mb-1">Línea / Servicio</label>
+                        <input list="lineas-list" type="text" required value={linea} onChange={e=>setLinea(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none text-white" placeholder="Buscar..." />
                         <datalist id="lineas-list">{lineasUnicas.map(l => <option key={l} value={l} />)}</datalist>
                     </div>
                 </div>
@@ -127,31 +129,36 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
                         <MapPin size={18} className={gpsStatus === 'ok' ? 'text-green-400' : 'text-red-400'} />
                         <span className="text-sm font-medium">{gpsStatus === 'ok' ? 'GPS Capturado' : 'GPS No Disponible'}</span>
                     </div>
-                    {gpsStatus !== 'ok' && <input type="text" value={ubicacionManual} onChange={e=>setUbicacionManual(e.target.value)} placeholder="Calle/Intersección..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none" required />}
+                    {gpsStatus !== 'ok' && <input type="text" value={ubicacionManual} onChange={e=>setUbicacionManual(e.target.value)} placeholder="Calle/Intersección..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none text-white" required />}
                 </div>
 
-                <div>
-                    <label className="block text-xs text-gray-400 mb-2">Sentido</label>
-                    <div className="flex gap-2">
-                        {['Ascendente', 'Descendente', 'Ambos'].map(op => <button type="button" key={op} onClick={() => setSentido(op)} className={`flex-1 py-3 rounded-lg text-sm font-bold border ${sentido === op ? 'bg-sky-600 border-sky-500' : 'bg-gray-800 border-gray-600'}`}>{op}</button>)}
-                    </div>
-                </div>
+                {/* ESTOS BLOQUES AHORA SE OCULTAN SI LA CATEGORÍA ES 'PASAJEROS' */}
+                {categoria?.id !== 'pasajeros' && (
+                    <>
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-2">Sentido</label>
+                            <div className="flex gap-2">
+                                {['Ascendente', 'Descendente', 'Ambos'].map(op => <button type="button" key={op} onClick={() => setSentido(op)} className={`flex-1 py-3 rounded-lg text-sm font-bold border transition-colors ${sentido === op ? 'bg-sky-600 border-sky-500 text-white' : 'bg-gray-800 border-gray-600 text-gray-400'}`}>{op}</button>)}
+                            </div>
+                        </div>
 
-                <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 space-y-3">
-                    <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium">¿Hubo desvío?</label>
-                        <button type="button" onClick={() => setHuboDesvio(!huboDesvio)} className={`w-14 h-8 rounded-full relative transition-colors ${huboDesvio ? 'bg-green-500' : 'bg-gray-600'}`}><div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-all ${huboDesvio ? 'left-7' : 'left-1'}`}></div></button>
-                    </div>
-                    {huboDesvio && <input type="text" value={rutaAlternativa} onChange={e=>setRutaAlternativa(e.target.value)} placeholder="Ruta alternativa..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none" />}
-                </div>
+                        <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 space-y-3">
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm font-medium">¿Hubo desvío?</label>
+                                <button type="button" onClick={() => setHuboDesvio(!huboDesvio)} className={`w-14 h-8 rounded-full relative transition-colors ${huboDesvio ? 'bg-green-500' : 'bg-gray-600'}`}><div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-all ${huboDesvio ? 'left-7' : 'left-1'}`}></div></button>
+                            </div>
+                            {huboDesvio && <input type="text" value={rutaAlternativa} onChange={e=>setRutaAlternativa(e.target.value)} placeholder="Ruta alternativa..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none text-white" />}
+                        </div>
+                    </>
+                )}
 
                 <div>
                     <label className="flex items-center gap-1 text-xs text-gray-400 mb-1"><Info size={14}/> Detalles de la problemática / Observaciones</label>
-                    <textarea rows={3} value={observaciones} onChange={e=>setObservaciones(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500" placeholder="Escriba aquí los detalles..." required={categoria.id === 'pasajeros'}></textarea>
+                    <textarea rows={4} value={observaciones} onChange={e=>setObservaciones(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500 text-white" placeholder="Escriba aquí los detalles..." required={categoria.id === 'pasajeros'}></textarea>
                 </div>
 
-                <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800">
-                    <button type="submit" className="w-full bg-sky-500 text-white font-bold text-lg py-4 rounded-xl active:bg-sky-600">Enviar a Base</button>
+                <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800 z-50">
+                    <button type="submit" className="w-full bg-sky-500 text-white font-bold text-lg py-4 rounded-xl active:bg-sky-600 transition-transform active:scale-95 shadow-lg">Enviar a Base</button>
                 </div>
             </form>
         </div>
