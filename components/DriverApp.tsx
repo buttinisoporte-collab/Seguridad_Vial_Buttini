@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { MapPin, AlertTriangle, CheckCircle, Navigation, AlertOctagon, Construction, Zap, Info, LogOut, User as UserIcon } from 'lucide-react';
+import { MapPin, AlertTriangle, CheckCircle, Navigation, AlertOctagon, Construction, Zap, Info, LogOut, User as UserIcon, Users } from 'lucide-react';
 import type { Risk, DriverReportDetails, Position, User, Route } from '../types';
 
 interface DriverAppProps {
@@ -16,10 +16,9 @@ const CATEGORIAS_IRAM =[
     { id: 'senalizacion', name: 'Señalización/Semáforo', desc: 'Apagado, tapada', icon: <Zap size={32}/>, color: '#eab308' },
     { id: 'desvio', name: 'Corte/Desvío', desc: 'Obra, evento, accidente', icon: <Navigation size={32}/>, color: '#8b5cf6' },
     { id: 'riesgo', name: 'Punto de Riesgo', desc: 'Agua, baja visibilidad, animales', icon: <AlertTriangle size={32}/>, color: '#3b82f6' },
+    // NUEVA CATEGORÍA AÑADIDA 👇
+    { id: 'pasajeros', name: 'Problemática Pasajeros', desc: 'Falta de pago, agresión, menores, etc.', icon: <Users size={32}/>, color: '#ec4899' },
 ];
-
-// Unidades Mockeadas para el autocompletado (Se podrían cargar de la DB a futuro)
-const UNIDADES_HABILITADAS = Array.from({length: 150}, (_, i) => (i + 1).toString().padStart(3, '0'));
 
 export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onSaveReport, onLogout }) => {
     const[step, setStep] = useState<1 | 2 | 3>(1);
@@ -61,10 +60,9 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
         const newRisk: Risk = {
             id: uuidv4(),
             position: gpsPosition || { lat: -34.6175, lng: -68.335 },
-            // SIEMPRE SE FUERZA EL TIPO NEGRO DE INCIDENTE EN RUTA
-            riskTypeId: 'incidente-ruta',
+            riskTypeId: 'incidente-ruta', // Siempre fuerza el tipo negro por defecto para novedades
             description: observaciones || `Reporte IRAM: ${categoria.name}`,
-            associatedRouteIds: [], images:[], driverReportDetails: driverDetails,
+            associatedRouteIds:[], images:[], driverReportDetails: driverDetails,
             timestamp: Date.now()
         };
 
@@ -115,11 +113,10 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                         <label className="block text-xs text-gray-400 mb-1">Unidad N°</label>
-                        <input list="unidades-list" type="text" required value={unidad} onChange={e=>setUnidad(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Buscar..." />
-                        <datalist id="unidades-list">{UNIDADES_HABILITADAS.map(u => <option key={u} value={u} />)}</datalist>
+                        <input type="text" required value={unidad} onChange={e=>setUnidad(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Ej: 142" />
                     </div>
                     <div>
-                        <label className="block text-xs text-gray-400 mb-1">Línea / Servicio</label>
+                        <label className="block text-xs text-gray-400 mb-1">Línea/Servicio</label>
                         <input list="lineas-list" type="text" required value={linea} onChange={e=>setLinea(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold focus:border-sky-500 outline-none" placeholder="Buscar..." />
                         <datalist id="lineas-list">{lineasUnicas.map(l => <option key={l} value={l} />)}</datalist>
                     </div>
@@ -149,8 +146,8 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
                 </div>
 
                 <div>
-                    <label className="flex items-center gap-1 text-xs text-gray-400 mb-1"><Info size={14}/> Detalles</label>
-                    <textarea rows={2} value={observaciones} onChange={e=>setObservaciones(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500"></textarea>
+                    <label className="flex items-center gap-1 text-xs text-gray-400 mb-1"><Info size={14}/> Detalles de la problemática / Observaciones</label>
+                    <textarea rows={3} value={observaciones} onChange={e=>setObservaciones(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500" placeholder="Escriba aquí los detalles..." required={categoria.id === 'pasajeros'}></textarea>
                 </div>
 
                 <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800">
