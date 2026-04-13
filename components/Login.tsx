@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { ShieldCheck, Bus } from 'lucide-react';
 import type { User } from '../types';
 
-// 👇 IMPORTAMOS EL LOGO DIRECTAMENTE 👇
-import logoEmpresa from '../logo.png';
+// 👇 REEMPLAZA ESTA CADENA CON EL BASE64 REAL DE TU LOGO 👇
+const LOGO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 interface LoginProps {
     users: User[];
@@ -40,12 +40,12 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, isDriverMode }) =>
             <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md m-4">
                 <div className="flex flex-col items-center mb-6 text-center">
                     
-                    {/* 👇 USAMOS LA VARIABLE DEL LOGO IMPORTADO 👇 */}
+                    {/* 👇 IMAGEN CARGADA COMO BASE64 👇 */}
                     <img 
-                        src={logoEmpresa} 
+                        src={LOGO_BASE64} 
                         alt="Logo Empresa" 
                         className="h-24 w-auto mb-4 object-contain drop-shadow-lg" 
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }} // Oculta si falla por si acaso
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }} 
                     />
                     
                     <h1 className="text-2xl font-bold text-white">

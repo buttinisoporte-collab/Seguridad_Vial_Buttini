@@ -8,8 +8,10 @@ import { NovedadesList } from './NovedadesList';
 import { SiniestrosAdmin } from './SiniestrosAdmin';
 import { Settings } from './Settings';
 import { UserManager } from './UserManager';
-import { MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List, ShieldAlert } from 'lucide-react';
-import logoEmpresa from '../logo.png';
+import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List, ShieldAlert } from 'lucide-react';
+
+// 👇 REEMPLAZA ESTA CADENA CON EL BASE64 REAL DE TU LOGO 👇
+const LOGO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 interface PanelProps {
     currentUser: User; onLogout: () => void; users: User[]; setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -83,10 +85,10 @@ export const Panel: React.FC<PanelProps> = ({
         <aside className="w-[420px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
                 
-                {/* AQUÍ SE CARGA EL LOGO EN LA BARRA LATERAL */}
+                {/* 👇 IMAGEN CARGADA COMO BASE64 👇 */}
                  <div className="flex items-center justify-center mb-4 w-full px-2 mt-1" title={`Conectado como: ${currentUser.name}`}>
                     <img 
-                        src={logoEmpresa} 
+                        src={LOGO_BASE64} 
                         alt="Logo" 
                         className="w-14 h-14 object-contain" 
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
