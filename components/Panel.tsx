@@ -8,15 +8,14 @@ import { NovedadesList } from './NovedadesList';
 import { SiniestrosAdmin } from './SiniestrosAdmin';
 import { Settings } from './Settings';
 import { UserManager } from './UserManager';
-import { Map, MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List, ShieldAlert } from 'lucide-react';
+import { MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List, ShieldAlert } from 'lucide-react';
 
 interface PanelProps {
     currentUser: User; onLogout: () => void; users: User[]; setUsers: React.Dispatch<React.SetStateAction<User[]>>;
     riskTypes: RiskType[]; setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
     routes: Route[]; setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
     risks: Risk[]; setRisks: React.Dispatch<React.SetStateAction<Risk[]>>;
-    siniestros: Siniestro[]; incidentRisks: Risk[]; // RECIBE RIESGOS MANUALES QUE SON SINIESTROS
-    handleDeleteSiniestro: (id: string) => void;
+    siniestros: Siniestro[]; incidentRisks: Risk[]; handleDeleteSiniestro: (id: string) => void;
     proximityDistance: number; setProximityDistance: React.Dispatch<React.SetStateAction<number>>;
     driverReportTTL: number; setDriverReportTTL: React.Dispatch<React.SetStateAction<number>>;
     onAddRoute: (name: string, origin: string, destination: string, group: string, line: string, service: string, kmlFile: File) => void;
@@ -82,7 +81,15 @@ export const Panel: React.FC<PanelProps> = ({
     return (
         <aside className="w-[420px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
-                 <div className="flex items-center text-sky-400 mb-2" title={`Conectado como: ${currentUser.name}`}><Map size={32} /></div>
+                
+                {/* AQUÍ SE CARGA EL LOGO EN LA BARRA LATERAL */}
+                 <div className="flex items-center justify-center mb-4 w-full px-2 mt-1" title={`Conectado como: ${currentUser.name}`}>
+                    <img 
+                        src="/logo.png" 
+                        alt="Logo" 
+                        className="w-14 h-14 object-contain" 
+                    />
+                 </div>
                 
                 {renderTabButton('routes', <MapPin size={24} />, 'Recorridos')}
                 {renderTabButton('riskTypes', <AlertTriangle size={24} />, 'Carga de Datos')}

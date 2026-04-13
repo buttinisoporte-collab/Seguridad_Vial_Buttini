@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Bus } from 'lucide-react';
 import type { User } from '../types';
 
 interface LoginProps {
     users: User[];
     onLogin: (user: User) => void;
-    isDriverMode?: boolean; // NUEVO: Define cómo se ve y actúa el login
+    isDriverMode?: boolean;
 }
 
 export const Login: React.FC<LoginProps> = ({ users, onLogin, isDriverMode }) => {
@@ -16,11 +15,10 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, isDriverMode }) =>
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Filtra usuarios basado en el modo en que estamos
         const foundUser = users.find(u => 
             u.username.toLowerCase() === username.toLowerCase() && 
             u.pin === password &&
-            (isDriverMode ? u.isDriver : !u.isDriver) // Bloquea acceso cruzado
+            (isDriverMode ? u.isDriver : !u.isDriver)
         );
         
         if (foundUser) {
@@ -37,10 +35,14 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, isDriverMode }) =>
         <div className="flex h-screen w-screen items-center justify-center bg-gray-900">
             <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md m-4">
                 <div className="flex flex-col items-center mb-6 text-center">
-                    {isDriverMode 
-                        ? <Bus size={56} className="text-green-500 mb-3" />
-                        : <ShieldCheck size={56} className="text-sky-500 mb-3" />
-                    }
+                    
+                    {/* AQUÍ SE CARGA EL LOGO DESDE LA CARPETA PUBLIC */}
+                    <img 
+                        src="/logo.png" 
+                        alt="Logo Empresa" 
+                        className="h-24 w-auto mb-4 object-contain drop-shadow-lg" 
+                    />
+                    
                     <h1 className="text-2xl font-bold text-white">
                         {isDriverMode ? 'Módulo Conductor' : 'Sistema de Gestión'}
                     </h1>
