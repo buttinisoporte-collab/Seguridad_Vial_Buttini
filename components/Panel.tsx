@@ -9,6 +9,7 @@ import { SiniestrosAdmin } from './SiniestrosAdmin';
 import { Settings } from './Settings';
 import { UserManager } from './UserManager';
 import { MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List, ShieldAlert } from 'lucide-react';
+import logoEmpresa from '../logo.png';
 
 interface PanelProps {
     currentUser: User; onLogout: () => void; users: User[]; setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -85,9 +86,10 @@ export const Panel: React.FC<PanelProps> = ({
                 {/* AQUÍ SE CARGA EL LOGO EN LA BARRA LATERAL */}
                  <div className="flex items-center justify-center mb-4 w-full px-2 mt-1" title={`Conectado como: ${currentUser.name}`}>
                     <img 
-                        src="/logo.png" 
+                        src={logoEmpresa} 
                         alt="Logo" 
                         className="w-14 h-14 object-contain" 
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                  </div>
                 
