@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { Siniestro, Risk, RiskType } from '../types';
+import type { Siniestro, Risk, RiskType, Position } from '../types';
 import { ShieldAlert, Trash2, Folder, MapPin } from 'lucide-react';
 
 interface SiniestrosAdminProps {
@@ -10,10 +10,11 @@ interface SiniestrosAdminProps {
     handleDeleteRisk: (id: string) => void;
     selectedSiniestroId: string | null;
     setSelectedSiniestroId: (id: string | null) => void;
+    onFocusPosition: (pos: Position) => void;
 }
 
 export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({ 
-    siniestros, incidentRisks, riskTypes, handleDeleteSiniestro, handleDeleteRisk, selectedSiniestroId, setSelectedSiniestroId 
+    siniestros, incidentRisks, riskTypes, handleDeleteSiniestro, handleDeleteRisk, selectedSiniestroId, setSelectedSiniestroId, onFocusPosition
 }) => {
     
     // Unificar y ordenar ambas listas (IRAM y Manuales del Mapa)
@@ -39,7 +40,12 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                             const sin = item.data as Siniestro;
                             return (
                                 <div key={sin.id} className={`bg-gray-800 border transition-colors rounded-lg shadow-md overflow-hidden ${selectedSiniestroId === sin.id ? 'border-red-500' : 'border-gray-700'}`}>
-                                    <div className="p-4 cursor-pointer hover:bg-gray-750 flex justify-between items-center" onClick={() => setSelectedSiniestroId(selectedSiniestroId === sin.id ? null : sin.id)}>
+                                    <div className="p-4 cursor-pointer hover:bg-gray-750 flex justify-between items-center" onClick={() => {
+                                        setSelectedSiniestroId(selectedSiniestroId === sin.id ? null : sin.id);
+                                        if (sin.ubicacion?.lat && sin.ubicacion?.lng) {
+                                            onFocusPosition({ lat: sin.ubicacion.lat, lng: sin.ubicacion.lng });
+                                        }
+                                    }}>
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="bg-red-900 text-red-300 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Formulario IRAM</span>
@@ -107,7 +113,10 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                             const rt = riskTypes.find(t => t.id === risk.riskTypeId);
                             return (
                                 <div key={risk.id} className={`bg-gray-800 border transition-colors rounded-lg shadow-md overflow-hidden ${selectedSiniestroId === risk.id ? 'border-orange-500' : 'border-gray-700'}`}>
-                                    <div className="p-4 cursor-pointer hover:bg-gray-750 flex justify-between items-center" onClick={() => setSelectedSiniestroId(selectedSiniestroId === risk.id ? null : risk.id)}>
+                                    <div className="p-4 cursor-pointer hover:bg-gray-750 flex justify-between items-center" onClick={() => {
+                                        setSelectedSiniestroId(selectedSiniestroId === risk.id ? null : risk.id);
+                                        if (risk.position) onFocusPosition(risk.position);
+                                    }}>
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="bg-orange-900 text-orange-300 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide">Carga Manual (Mapa)</span>
