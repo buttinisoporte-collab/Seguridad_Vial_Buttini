@@ -1,4 +1,3 @@
-const LOGO_BASE64 = "";
 import React from 'react';
 import type { RiskType, Route, Risk, AppTab, User, Siniestro, Position } from '../types';
 import { RouteManager } from './RouteManager';
