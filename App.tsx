@@ -37,7 +37,7 @@ const MapFixer = () => {
 
 const MapFocusUpdater = ({ focusPosition }: { focusPosition: Position | null }) => {
     const map = useMap();
-    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); }, [focusPosition, map]);
+    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); },[focusPosition, map]);
     return null;
 };
 
@@ -57,15 +57,20 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     return false;
 };
 
-const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes, risks }) => {
+const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: Siniestro[], activeTab?: string }> = ({ routes, risks, siniestros, activeTab }) => {
     const map = useMap();
     useEffect(() => {
         const points: LatLngExpression[] =[];
         if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features && Array.isArray(r.geoJson.features)) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
         if (Array.isArray(risks)) risks.forEach(r => { if (r?.position?.lat && r?.position?.lng) points.push([r.position.lat, r.position.lng]); });
+        
+        if (activeTab === 'siniestros' && Array.isArray(siniestros)) {
+            siniestros.forEach(s => { if (s?.ubicacion?.lat && s?.ubicacion?.lng) points.push([s.ubicacion.lat, s.ubicacion.lng]); });
+        }
+
         if (Array.isArray(points) && points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
-    },[routes, risks, map]);
+    },[routes, risks, siniestros, activeTab, map]);
     return null;
 };
 
@@ -80,21 +85,21 @@ const App: React.FC = () => {
     const[showIncidents, setShowIncidents] = useState(true);
     const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
-    const[filterService, setFilterService] = useState('');
+    const [filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
     
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
-    const[users, setUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
     const [risks, setRisks] = useState<Risk[]>([]);
-    const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
+    const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
-    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const [showAllRoutes, setShowAllRoutes] = useState(true); 
+    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const[showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
@@ -109,7 +114,7 @@ const App: React.FC = () => {
 
     useEffect(() => { localStorage.setItem('tg_token', telegramToken); },[telegramToken]);
     useEffect(() => { localStorage.setItem('tg_chat', telegramChatId); },[telegramChatId]);
-    useEffect(() => { localStorage.setItem('groupColors', JSON.stringify(groupColors)); },[groupColors]);
+    useEffect(() => { localStorage.setItem('groupColors', JSON.stringify(groupColors)); }, [groupColors]);
 
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
@@ -123,7 +128,7 @@ const App: React.FC = () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const publicRouteId = urlParams.get('publicRoute');
-    const expireParam = urlParams.get('expire');
+    const expireParam = urlParams.get('expire'); 
     const isDriverMode = urlParams.get('mode') === 'driver';
     const isSiniestroMode = urlParams.get('mode') === 'siniestro';
 
@@ -143,7 +148,7 @@ const App: React.FC = () => {
                         dbRiskTypes.push(incType); saveRiskTypeToDB(incType).catch(()=>{});
                     }
                     if (!dbRiskTypes.find(rt => rt.id === 'novedad-ruta')) {
-                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }; 
+                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false };
                         dbRiskTypes.push(novType); saveRiskTypeToDB(novType).catch(()=>{});
                     }
                     setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; 
@@ -264,14 +269,13 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
-    const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
-
-    // 👇 AQUÍ ESTÁ LA LÍNEA QUE FALTABA Y CAUSABA EL ERROR 👇
+    // OBTENEMOS LOS RIESGOS MANUALES DE MAPA QUE SON SINIESTROS PARA PASAR AL PANEL
     const incidentRisks = useMemo(() => Array.isArray(risks) ? risks.filter(r => {
-        const rt = getRiskType(r.riskTypeId);
+        const rt = riskTypes.find(t => t.id === r.riskTypeId);
         return rt && rt.isIncident && !r.driverReportDetails;
-    }) : [], [risks, getRiskType]);
+    }) : [], [risks, riskTypes]);
 
+    // FUNCIONES TELEGRAM
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
         const d = risk.driverReportDetails; if (!d) return;
@@ -349,12 +353,16 @@ const App: React.FC = () => {
         reader.readAsText(kmlFile);
     }, [proximityDistance]);
    
+    const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
+
+    // LÓGICA DE FILTRADO INDEPENDIENTE
     const baseVisibleRisks = useMemo(() => Array.isArray(risks) ? risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
         if (!rt) return false;
         
         if (risk.isVisibleOnMap === false) return false;
 
+        // FILTRO DE LA PESTAÑA NOVEDADES
         if (activeTab === 'novedades') {
             if (!risk.driverReportDetails) return false;
             if (novedadesFilterLine && !risk.driverReportDetails.linea.toLowerCase().includes(novedadesFilterLine.toLowerCase())) return false;
@@ -362,11 +370,18 @@ const App: React.FC = () => {
             return true;
         }
 
+        // FILTRO DE LA PESTAÑA SINIESTROS (Solo incidentes manuales del mapa sin reporte de conductor)
+        if (activeTab === 'siniestros') {
+            return rt.isIncident && !risk.driverReportDetails;
+        }
+
+        // PESTAÑA RECORRIDOS (Aplica checks globales)
         if (activeTab === 'routes') {
             if (rt.isIncident && !showIncidents) return false;
             if (!rt.isIncident && !showRisks) return false;
         }
 
+        // Oculta novedades caducadas del mapa general
         if (risk.driverReportDetails && risk.timestamp && ((Date.now() - risk.timestamp) / 3600000) > driverReportTTL) return false;
         return true;
     }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL, activeTab, novedadesFilterLine, novedadesFilterDate]);
@@ -396,7 +411,10 @@ const App: React.FC = () => {
             const sin = siniestros.find(s => s.id === selectedSiniestroId);
             const manualRisk = risks.find(r => r.id === selectedSiniestroId);
             
-            if (sin) return routes.filter(r => r.line === sin.conductor.linea);
+            if (sin) {
+                if ((sin as any).associatedRouteId) return routes.filter(r => r.id === (sin as any).associatedRouteId);
+                return routes.filter(r => r.line === sin.conductor.linea);
+            }
             if (manualRisk) return routes.filter(r => (manualRisk.associatedRouteIds || []).includes(r.id));
             return[];
         }
@@ -411,11 +429,7 @@ const App: React.FC = () => {
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
     if (isSiniestroMode) {
-        return <SiniestroForm onSaveSiniestro={async (sin) => { 
-            setSiniestros(prev =>[...prev, sin]); 
-            await saveSiniestroToDB(sin); 
-            sendSiniestroTelegramNotification(sin); 
-        }} />;
+        return <SiniestroForm onSaveSiniestro={async (sin) => { setSiniestros(prev => [...prev, sin]); await saveSiniestroToDB(sin); sendSiniestroTelegramNotification(sin); }} />;
     }
 
     if (isDriverMode) {
@@ -456,6 +470,7 @@ const App: React.FC = () => {
                 setFocusPosition={setFocusPosition} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes}
                 telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId}
                 onUpdateRisk={(updatedRisk) => { setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r)); }}
+                onUpdateSiniestro={(updatedSin) => { setSiniestros(prev => prev.map(s => s.id === updatedSin.id ? updatedSin : s)); }}
                 groupColors={groupColors} setGroupColors={setGroupColors}
                 novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate}
                 novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine}
@@ -468,7 +483,7 @@ const App: React.FC = () => {
                     <MapFixer />
                     <MapFocusUpdater focusPosition={focusPosition} />
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
-                    <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} />
+                    <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} />
                     {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <MapClickHandler onMapClick={handleMapClick} />}
 
                     {visibleRoutes.map(route => {
@@ -496,7 +511,9 @@ const App: React.FC = () => {
                        
                         return (
                              <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
+                                {/* TOOLTIPS FIJOS EN TODO EL MAPA */}
                                 <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{riskType.name}</Tooltip>
+                                
                                 <Popup>
                                     <div className="flex justify-between items-start mb-1 min-w-[250px]">
                                         <div>
@@ -552,7 +569,7 @@ const App: React.FC = () => {
                     {/* MARCADORES PARA LOS SINIESTROS IRAM SOLO EN SU PESTAÑA */}
                     {activeTab === 'siniestros' && Array.isArray(siniestros) && siniestros.map(sin => {
                         if (!sin.ubicacion?.lat || !sin.ubicacion?.lng) return null;
-                        const icon = createRiskIcon('#ef4444'); // Rojo fuerte
+                        const icon = createRiskIcon('#ef4444'); 
                         return (
                             <Marker key={`iram-${sin.id}`} position={[sin.ubicacion.lat, sin.ubicacion.lng]} icon={icon}>
                                 <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro IRAM</Tooltip>

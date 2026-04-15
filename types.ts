@@ -15,11 +15,7 @@ export interface Risk {
     driverReportDetails?: DriverReportDetails; timestamp?: number; isVisibleOnMap?: boolean;
 }
 
-export interface Consecuencia {
-    tipo: string;
-    activa: boolean;
-    cantidad: string;
-}
+export interface Consecuencia { tipo: string; activa: boolean; cantidad: string; }
 
 export interface Siniestro {
     id: string; timestamp: number; fechaHora: string;
@@ -33,6 +29,7 @@ export interface Siniestro {
     };
     images: string[];
     driveUrl?: string; 
+    associatedRouteId?: string; // NUEVO: Para asignar ruta manualmente
 }
 
 export interface GeoJSONFeature<T> { type: "Feature"; properties: any; geometry: T; }

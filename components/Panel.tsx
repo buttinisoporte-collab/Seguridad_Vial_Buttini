@@ -1,3 +1,4 @@
+const LOGO_BASE64 = "";
 import React from 'react';
 import type { RiskType, Route, Risk, AppTab, User, Siniestro, Position } from '../types';
 import { RouteManager } from './RouteManager';
@@ -38,6 +39,7 @@ interface PanelProps {
     telegramToken: string; setTelegramToken: (v: string) => void;
     telegramChatId: string; setTelegramChatId: (v: string) => void;
     onUpdateRisk: (risk: Risk) => void;
+    onUpdateSiniestro: (sin: Siniestro) => void; // AÑADIDO PARA SINIESTROS
     groupColors: Record<string, string>; setGroupColors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     novedadesFilterDate: string; setNovedadesFilterDate: (v: string) => void;
     novedadesFilterLine: string; setNovedadesFilterLine: (v: string) => void;
@@ -51,7 +53,7 @@ export const Panel: React.FC<PanelProps> = ({
     proximityDistance, setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
-    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, groupColors, setGroupColors,
+    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, onUpdateSiniestro, groupColors, setGroupColors,
     novedadesFilterDate, setNovedadesFilterDate, novedadesFilterLine, setNovedadesFilterLine, showNovedadesRoutes, setShowNovedadesRoutes,
     selectedSiniestroId, setSelectedSiniestroId, showRiskViewerRoutes, setShowRiskViewerRoutes
 }) => {
@@ -62,7 +64,7 @@ export const Panel: React.FC<PanelProps> = ({
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} />;
             case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
-            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} />;
+            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} onUpdateSiniestro={onUpdateSiniestro} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
             case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
@@ -84,16 +86,9 @@ export const Panel: React.FC<PanelProps> = ({
     return (
         <aside className="w-[420px] h-full flex bg-gray-800 text-white shadow-lg z-10 flex-shrink-0 relative">
             <div className="w-20 bg-gray-900 flex flex-col items-center py-4 space-y-1 overflow-y-auto">
-                
                  <div className="flex items-center justify-center mb-4 w-full px-2 mt-1" title={`Conectado como: ${currentUser.name}`}>
-                    <img 
-                        src={LOGO_BASE64} 
-                        alt="Logo" 
-                        className="w-14 h-14 object-contain" 
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
+                    <img src={LOGO_BASE64} alt="Logo" className="w-14 h-14 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                  </div>
-                
                 {renderTabButton('routes', <MapPin size={24} />, 'Recorridos')}
                 {renderTabButton('riskTypes', <AlertTriangle size={24} />, 'Carga de Datos')}
                 {renderTabButton('novedades', <List size={24} />, 'Novedades')}
@@ -102,13 +97,10 @@ export const Panel: React.FC<PanelProps> = ({
                 {renderTabButton('reports', <FileBarChart size={24} />, 'Riesgo por Servicio')}
                 {renderTabButton('settings', <SettingsIcon size={24} />, 'Ajustes')}
                 {renderTabButton('users', <Users size={24} />, 'Usuarios')}
-
                 <div className="flex-1"></div>
-                
                 {!currentUser.isAdmin && !currentUser.isDriver && (
                     <button onClick={() => { const p = window.prompt("Nueva contraseña:"); if(p) { setUsers(users.map(u => u.id===currentUser.id?{...u, pin: p}:u)); alert("Actualizada"); } }} className="flex flex-col items-center justify-center p-2 w-full text-[10px] text-yellow-400 hover:bg-gray-800" title="Cambiar mi Contraseña"><Key size={20} /><span className="mt-1 text-center leading-tight">Clave</span></button>
                 )}
-
                 <button onClick={onLogout} className="flex flex-col items-center justify-center p-2 w-full text-xs text-red-400 hover:bg-red-900/50 hover:text-white mt-1" title="Cerrar Sesión"><LogOut size={24} /><span className="mt-1 text-center leading-tight">Salir</span></button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">{renderTabContent()}</div>
