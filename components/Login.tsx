@@ -49,10 +49,10 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, isDriverMode }) =>
                     />
                     
                     <h1 className="text-2xl font-bold text-white">
-                        {isDriverMode ? 'Módulo Conductor' : 'Sistema de Gestión'}
+                        {isDriverMode ? 'Módulo Conductor' : 'Matriz de análisis de riesgos de seguridad vial'}
                     </h1>
                     <p className="text-sm text-gray-400">
-                        {isDriverMode ? 'Reporte de Novedades en Ruta (IRAM 3810)' : 'Riesgo Vial y Novedades'}
+                        {isDriverMode ? 'Reporte de Novedades en Ruta (IRAM 3810)' : 'Sistema integral de gestión'}
                     </p>
                 </div>
                 

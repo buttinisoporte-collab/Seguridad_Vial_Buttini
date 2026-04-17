@@ -37,7 +37,7 @@ const MapFixer = () => {
 
 const MapFocusUpdater = ({ focusPosition }: { focusPosition: Position | null }) => {
     const map = useMap();
-    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); },[focusPosition, map]);
+    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); }, [focusPosition, map]);
     return null;
 };
 
@@ -81,7 +81,7 @@ const App: React.FC = () => {
     const[currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
 
     const[activeTab, setActiveTab] = useState<AppTab>('routes');
-    const [showRisks, setShowRisks] = useState(true);
+    const[showRisks, setShowRisks] = useState(true);
     const[showIncidents, setShowIncidents] = useState(true);
     const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
@@ -99,7 +99,7 @@ const App: React.FC = () => {
     const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const[showAllRoutes, setShowAllRoutes] = useState(true); 
+    const [showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
@@ -275,7 +275,6 @@ const App: React.FC = () => {
         return rt && rt.isIncident && !r.driverReportDetails;
     }) : [], [risks, riskTypes]);
 
-    // FUNCIONES TELEGRAM
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
         const d = risk.driverReportDetails; if (!d) return;
@@ -355,14 +354,12 @@ const App: React.FC = () => {
    
     const getRiskType = useCallback((id: string): RiskType | undefined => riskTypes.find(rt => rt.id === id),[riskTypes]);
 
-    // LÓGICA DE FILTRADO INDEPENDIENTE
     const baseVisibleRisks = useMemo(() => Array.isArray(risks) ? risks.filter(risk => {
         const rt = getRiskType(risk.riskTypeId);
         if (!rt) return false;
         
         if (risk.isVisibleOnMap === false) return false;
 
-        // FILTRO DE LA PESTAÑA NOVEDADES
         if (activeTab === 'novedades') {
             if (!risk.driverReportDetails) return false;
             if (novedadesFilterLine && !risk.driverReportDetails.linea.toLowerCase().includes(novedadesFilterLine.toLowerCase())) return false;
@@ -370,27 +367,19 @@ const App: React.FC = () => {
             return true;
         }
 
-        // FILTRO DE LA PESTAÑA SINIESTROS (Solo incidentes manuales del mapa sin reporte de conductor)
-        if (activeTab === 'siniestros') {
-            return rt.isIncident && !risk.driverReportDetails;
-        }
-
-        // PESTAÑA RECORRIDOS (Aplica checks globales)
         if (activeTab === 'routes') {
             if (rt.isIncident && !showIncidents) return false;
             if (!rt.isIncident && !showRisks) return false;
         }
 
-        // Oculta novedades caducadas del mapa general
         if (risk.driverReportDetails && risk.timestamp && ((Date.now() - risk.timestamp) / 3600000) > driverReportTTL) return false;
         return true;
     }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL, activeTab, novedadesFilterLine, novedadesFilterDate]);
 
     const visibleRoutes = useMemo(() => {
+        if (!showAllRoutes) return[]; 
         if (!Array.isArray(routes)) return[];
-        
         if (activeTab === 'routes') {
-            if (!showAllRoutes) return[];
             return activeRouteId ? routes.filter(r => r.id === activeRouteId) : routes.filter(route => (filterGroup === '' || (route.group||'').toLowerCase().includes(filterGroup.toLowerCase())) && (filterLine === '' || (route.line||'').toLowerCase().includes(filterLine.toLowerCase())) && (filterService === '' || (route.service||'').toLowerCase().includes(filterService.toLowerCase())));
         } 
         else if (activeTab === 'reports') { return reportSelectedRouteId ? routes.filter(r => r.id === reportSelectedRouteId) :[]; } 
@@ -415,7 +404,7 @@ const App: React.FC = () => {
                 if ((sin as any).associatedRouteId) return routes.filter(r => r.id === (sin as any).associatedRouteId);
                 return routes.filter(r => r.line === sin.conductor.linea);
             }
-            if (manualRisk) return routes.filter(r => (manualRisk.associatedRouteIds || []).includes(r.id));
+            if (manualRisk) return routes.filter(r => (manualRisk.associatedRouteIds ||[]).includes(r.id));
             return[];
         }
         return routes;
@@ -456,7 +445,7 @@ const App: React.FC = () => {
     if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1></div>;
 
     return (
-        <div className="flex h-screen w-screen bg-gray-100 font-sans">
+        <>
             <Panel
                 currentUser={currentUser!} onLogout={handleLogout} users={users} setUsers={setUsers}
                 riskTypes={riskTypes} setRiskTypes={setRiskTypes} routes={routes} setRoutes={setRoutes} 
@@ -477,9 +466,8 @@ const App: React.FC = () => {
                 showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
                 selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId}
                 showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes}
-            />
-            <main className="flex-1 h-full relative">
-                 <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
+            >
+                <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
                     <MapFixer />
                     <MapFocusUpdater focusPosition={focusPosition} />
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
@@ -511,8 +499,7 @@ const App: React.FC = () => {
                        
                         return (
                              <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
-                                {/* TOOLTIPS FIJOS EN TODO EL MAPA */}
-                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{riskType.name}</Tooltip>
+                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{riskType.name}</Tooltip>
                                 
                                 <Popup>
                                     <div className="flex justify-between items-start mb-1 min-w-[250px]">
@@ -569,7 +556,7 @@ const App: React.FC = () => {
                     {/* MARCADORES PARA LOS SINIESTROS IRAM SOLO EN SU PESTAÑA */}
                     {activeTab === 'siniestros' && Array.isArray(siniestros) && siniestros.map(sin => {
                         if (!sin.ubicacion?.lat || !sin.ubicacion?.lng) return null;
-                        const icon = createRiskIcon('#ef4444'); 
+                        const icon = createRiskIcon('#ef4444'); // Rojo fuerte
                         return (
                             <Marker key={`iram-${sin.id}`} position={[sin.ubicacion.lat, sin.ubicacion.lng]} icon={icon}>
                                 <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro IRAM</Tooltip>
@@ -595,11 +582,11 @@ const App: React.FC = () => {
 
                     {newRiskPosition && activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
                 </MapContainer>
-            </main>
+            </Panel>
            
             {isAddRiskModalOpen && newRiskPosition && <RiskModal riskTypes={riskTypes} onClose={() => setIsAddRiskModalOpen(false)} onSave={(...args) => handleSaveRisk(uuidv4(), ...args, false)} />}
             {editingRisk && <RiskModal riskTypes={riskTypes} editingRisk={editingRisk} onClose={() => setEditingRisk(null)} onSave={(...args) => handleSaveRisk(editingRisk.id, ...args, true)} />}
-        </div>
+        </>
     );
 };
 export default App;
