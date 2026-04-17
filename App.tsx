@@ -37,7 +37,7 @@ const MapFixer = () => {
 
 const MapFocusUpdater = ({ focusPosition }: { focusPosition: Position | null }) => {
     const map = useMap();
-    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); },[focusPosition, map]);
+    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); }, [focusPosition, map]);
     return null;
 };
 
@@ -57,21 +57,21 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     return false;
 };
 
-const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: Siniestro[], activeTab?: string }> = ({ routes, risks, siniestros, activeTab }) => {
+const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes, risks }) => {
     const map = useMap();
     useEffect(() => {
         const points: LatLngExpression[] =[];
         if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features && Array.isArray(r.geoJson.features)) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
         if (Array.isArray(risks)) risks.forEach(r => { if (r?.position?.lat && r?.position?.lng) points.push([r.position.lat, r.position.lng]); });
-        if (activeTab === 'siniestros' && Array.isArray(siniestros)) { siniestros.forEach(s => { if (s?.ubicacion?.lat && s?.ubicacion?.lng) points.push([s.ubicacion.lat, s.ubicacion.lng]); }); }
         if (Array.isArray(points) && points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
-    },[routes, risks, siniestros, activeTab, map]);
+    },[routes, risks, map]);
     return null;
 };
 
 const App: React.FC = () => {
     const[isLoadingData, setIsLoadingData] = useState(true);
+    
     const[currentUser, setCurrentUser] = useState<User | null>(() => { const s = localStorage.getItem('currentUser'); return s ? JSON.parse(s) : null; });
     const[currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
 
@@ -84,16 +84,17 @@ const App: React.FC = () => {
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
     const[users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
-    const[risks, setRisks] = useState<Risk[]>([]);
+    const [risks, setRisks] = useState<Risk[]>([]);
     const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const[showAllRoutes, setShowAllRoutes] = useState(true); 
+    const [showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
@@ -145,7 +146,7 @@ const App: React.FC = () => {
                         dbRiskTypes.push(incType); saveRiskTypeToDB(incType).catch(()=>{});
                     }
                     if (!dbRiskTypes.find(rt => rt.id === 'novedad-ruta')) {
-                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false };
+                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }; // RIESGO, no siniestro
                         dbRiskTypes.push(novType); saveRiskTypeToDB(novType).catch(()=>{});
                     }
                     setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; 
@@ -266,19 +267,12 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
-    // BLINDAJE MAP: Garantizar que risks sea array al pasarlo al panel
-    const incidentRisks = useMemo(() => Array.isArray(risks) ? risks.filter(r => {
-        const rt = Array.isArray(riskTypes) ? riskTypes.find(t => t.id === r.riskTypeId) : undefined;
-        return rt && rt.isIncident && !r.driverReportDetails;
-    }) : [], [risks, riskTypes]);
-
-    // FUNCIONES TELEGRAM
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
         const d = risk.driverReportDetails; if (!d) return;
 
         const expireTs = Date.now() + (24 * 60 * 60 * 1000);
-        const publicUrl = `${window.location.origin}/?publicRoute=${Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds[0] || 'default' : 'default'}&expire=${expireTs}`;
+        const publicUrl = `${window.location.origin}/?publicRoute=${risk.associatedRouteIds?.[0] || 'default'}&expire=${expireTs}`;
 
         const safeText = (text?: string) => text ? String(text).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;') : '';
         const message = `🚨 <b>NOVEDAD EN RUTA</b> 🚨\n---------------------------\n👤 <b>Conductor:</b> ${safeText(d.conductorName)}\n🚌 <b>U:</b> ${safeText(d.unidad)} <b>Línea:</b> ${safeText(d.linea)}\n⚠️ <b>Tipo:</b> ${safeText(d.categoriaIRAM)}\n🔄 <b>Sentido:</b> ${safeText(d.sentido)}\n🚧 <b>Desvío:</b> ${d.huboDesvio?'SÍ':'NO'}\n📍 <b>Ubicación:</b> ${safeText(d.ubicacionManual) || 'GPS'}\n📝 <b>Detalles:</b> ${safeText(risk.description)}\n---------------------------\n📌 <a href="${publicUrl}">Ver en el Mapa de Riesgo</a>\n<i>⏳ Enlace válido por 24hs.</i>`;
@@ -289,12 +283,12 @@ const App: React.FC = () => {
     const sendSiniestroTelegramNotification = async (siniestro: Siniestro) => {
         if (!telegramToken || !telegramChatId) return;
         const safeText = (text?: string) => text ? String(text).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;') : '';
-        const message = `🆘 <b>¡ALERTA GRAVE - SINIESTRO VIAL!</b> 🆘\n-----------------------------------\n📅 <b>Fecha/Hora:</b> ${safeText(new Date(siniestro.fechaHora).toLocaleString('es-AR'))}\n👤 <b>Conductor:</b> ${safeText(siniestro.conductor?.nombre)} (Leg: ${safeText(siniestro.conductor?.legajo)})\n🚌 <b>Unidad:</b> ${safeText(siniestro.conductor?.interno)} | <b>Línea:</b> ${safeText(siniestro.conductor?.linea)}\n📍 <b>Ubicación:</b> ${safeText(siniestro.ubicacion?.manual)} (${safeText(siniestro.ubicacion?.lugar)})\n💥 <b>Tipo:</b> ${safeText(siniestro.descripcion?.tipo)}\n🚑 <b>Gravedad:</b> ${safeText(siniestro.descripcion?.gravedad)}\n📝 <b>Resumen:</b> ${safeText(siniestro.descripcion?.resumen)}\n-----------------------------------\n<i>Acceda al panel administrativo web para ver el reporte completo y fotografías.</i>`;
+        const message = `🆘 <b>¡ALERTA GRAVE - SINIESTRO VIAL!</b> 🆘\n-----------------------------------\n📅 <b>Fecha/Hora:</b> ${safeText(new Date(siniestro.fechaHora).toLocaleString('es-AR'))}\n👤 <b>Conductor:</b> ${safeText(siniestro.conductor.nombre)} (Leg: ${safeText(siniestro.conductor.legajo)})\n🚌 <b>Unidad:</b> ${safeText(siniestro.conductor.interno)} | <b>Línea:</b> ${safeText(siniestro.conductor.linea)}\n📍 <b>Ubicación:</b> ${safeText(siniestro.ubicacion.manual)} (${safeText(siniestro.ubicacion.lugar)})\n💥 <b>Tipo:</b> ${safeText(siniestro.descripcion.tipo)}\n🚑 <b>Gravedad:</b> ${safeText(siniestro.descripcion.gravedad)}\n📝 <b>Resumen:</b> ${safeText(siniestro.descripcion.resumen)}\n-----------------------------------\n<i>Acceda al panel administrativo web para ver el reporte completo y fotografías.</i>`;
         try { await fetch(`https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: telegramChatId.trim(), text: message, parse_mode: 'HTML' }) }); } catch (e) { console.error("Error enviando Telegram Siniestro", e); }
     };
 
     const handleDriverSave = useCallback((newRisk: Risk) => {
-        const riskType = Array.isArray(riskTypes) ? (riskTypes.find(rt => rt.id === 'novedad-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0]) : undefined;
+        const riskType = riskTypes.find(rt => rt.id === 'novedad-ruta') || riskTypes.find(rt => !rt.isIncident) || riskTypes[0];
         const finalizedRisk = { 
             ...newRisk, 
             riskTypeId: riskType?.id || '1', 
@@ -307,8 +301,8 @@ const App: React.FC = () => {
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
-    const handleMapClick = useCallback((latlng: LatLng) => { 
-        const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]; 
+    const handleMapClick = useCallback((latlng: LatLng) => {
+        const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { 
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); 
         } else if (activeTab === 'siniestros' && allowedTabs.includes('siniestros')) {
@@ -455,163 +449,161 @@ const App: React.FC = () => {
     if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1></div>;
 
     return (
-        <div className="flex h-screen w-screen bg-gray-100 font-sans">
-            <Panel
-                currentUser={currentUser!} onLogout={handleLogout} users={users} setUsers={setUsers}
-                riskTypes={riskTypes} setRiskTypes={setRiskTypes} routes={routes} setRoutes={setRoutes} 
-                risks={risks} setRisks={setRisks} siniestros={siniestros} incidentRisks={incidentRisks} handleDeleteSiniestro={(id) => { if(window.confirm('¿Borrar?')) setSiniestros(p => p.filter(s=>s.id!==id)); }}
-                proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL}
-                onAddRoute={handleAddRoute} getRiskType={getRiskType} activeTab={activeTab} setActiveTab={setActiveTab}
-                showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents}
-                filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService}
-                activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} reportSelectedRouteId={reportSelectedRouteId} setReportSelectedRouteId={setReportSelectedRouteId}
-                riskViewerSelectedTypes={riskViewerSelectedTypes} setRiskViewerSelectedTypes={setRiskViewerSelectedTypes} togglePublicRoute={togglePublicRoute} handleDeleteRisk={handleDeleteRisk}
-                setFocusPosition={setFocusPosition} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes}
-                telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId}
-                onUpdateRisk={(updatedRisk) => { setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r)); }}
-                onUpdateSiniestro={(updatedSin) => { setSiniestros(prev => prev.map(s => s.id === updatedSin.id ? updatedSin : s)); }}
-                groupColors={groupColors} setGroupColors={setGroupColors}
-                novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate}
-                novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine}
-                showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
-                selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId}
-                showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes}
-            >
-                <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
-                    <MapFixer />
-                    <MapFocusUpdater focusPosition={focusPosition} />
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
-                    <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} />
-                    {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes(activeTab) && <MapClickHandler onMapClick={handleMapClick} />}
+        <Panel
+            currentUser={currentUser!} onLogout={handleLogout} users={users} setUsers={setUsers}
+            riskTypes={riskTypes} setRiskTypes={setRiskTypes} routes={routes} setRoutes={setRoutes} 
+            risks={risks} setRisks={setRisks} siniestros={siniestros} incidentRisks={incidentRisks} handleDeleteSiniestro={(id) => { if(window.confirm('¿Borrar?')) setSiniestros(p => p.filter(s=>s.id!==id)); }}
+            proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL}
+            onAddRoute={handleAddRoute} getRiskType={getRiskType} activeTab={activeTab} setActiveTab={setActiveTab}
+            showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents}
+            filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService}
+            activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} reportSelectedRouteId={reportSelectedRouteId} setReportSelectedRouteId={setReportSelectedRouteId}
+            riskViewerSelectedTypes={riskViewerSelectedTypes} setRiskViewerSelectedTypes={setRiskViewerSelectedTypes} togglePublicRoute={togglePublicRoute} handleDeleteRisk={handleDeleteRisk}
+            setFocusPosition={setFocusPosition} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes}
+            telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId}
+            onUpdateRisk={(updatedRisk) => { setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r)); }}
+            onUpdateSiniestro={(updatedSin) => { setSiniestros(prev => prev.map(s => s.id === updatedSin.id ? updatedSin : s)); }}
+            groupColors={groupColors} setGroupColors={setGroupColors}
+            novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate}
+            novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine}
+            showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
+            selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId}
+            showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes}
+        >
+            <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
+                <MapFixer />
+                <MapFocusUpdater focusPosition={focusPosition} />
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} />
+                {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes(activeTab) && <MapClickHandler onMapClick={handleMapClick} />}
 
-                    {Array.isArray(visibleRoutes) && visibleRoutes.map(route => {
-                        const path: LatLngExpression[][] =[];
-                        if (route?.geoJson && Array.isArray(route.geoJson.features)) {
-                            route.geoJson.features.forEach(feature => { 
-                                if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
-                                    const validSegment = feature.geometry.coordinates.filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number').map((c: any) => [c[1], c[0]] as LatLngExpression);
-                                    if (validSegment.length > 0) path.push(validSegment);
-                                }
-                            });
-                        }
-                        if (path.length === 0) return null;
-                        const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer' || activeTab === 'novedades' || activeTab === 'siniestros') ? 1 : 0.4;
-                        let routeColor = groupColors[route.group] || "#0284c7"; 
-                        return <Polyline key={route.id} positions={path} color={routeColor} weight={5} opacity={opacity} />;
-                    })}
+                {Array.isArray(visibleRoutes) && visibleRoutes.map(route => {
+                    const path: LatLngExpression[][] =[];
+                    if (route?.geoJson && Array.isArray(route.geoJson.features)) {
+                        route.geoJson.features.forEach(feature => { 
+                            if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
+                                const validSegment = feature.geometry.coordinates.filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number').map((c: any) => [c[1], c[0]] as LatLngExpression);
+                                if (validSegment.length > 0) path.push(validSegment);
+                            }
+                        });
+                    }
+                    if (path.length === 0) return null;
+                    const opacity = (activeTab === 'routes' || activeTab === 'reports' || activeTab === 'riskViewer' || activeTab === 'novedades' || activeTab === 'siniestros') ? 1 : 0.4;
+                    let routeColor = groupColors[route.group] || "#0284c7"; 
+                    return <Polyline key={route.id} positions={path} color={routeColor} weight={5} opacity={opacity} />;
+                })}
 
-                    {Array.isArray(visibleRisks) && visibleRisks.map(risk => {
-                        if (!risk?.position || typeof risk.position.lat !== 'number' || typeof risk.position.lng !== 'number') return null;
-                        const riskType = getRiskType(risk.riskTypeId);
-                        if (!riskType) return null;
-                        const icon = createRiskIcon(riskType.color);
-                        const associatedRoutes = Array.isArray(routes) ? routes.filter(r => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(r.id)) :[];
-                       
-                        return (
-                             <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
-                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{riskType.name}</Tooltip>
-                                <Popup>
-                                    <div className="flex justify-between items-start mb-1 min-w-[250px]">
-                                        <div>
-                                            <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-wide">
-                                                {risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}
-                                            </div>
+                {Array.isArray(visibleRisks) && visibleRisks.map(risk => {
+                    if (!risk?.position || typeof risk.position.lat !== 'number' || typeof risk.position.lng !== 'number') return null;
+                    const riskType = getRiskType(risk.riskTypeId);
+                    if (!riskType) return null;
+                    const icon = createRiskIcon(riskType.color);
+                    const associatedRoutes = Array.isArray(routes) ? routes.filter(r => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(r.id)) :[];
+                   
+                    return (
+                         <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
+                            <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{riskType.name}</Tooltip>
+                            <Popup>
+                                <div className="flex justify-between items-start mb-1 min-w-[250px]">
+                                    <div>
+                                        <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
+                                        <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                                            {risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}
                                         </div>
-                                        {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
-                                            <div className="flex gap-1 ml-2">
-                                                {!risk.driverReportDetails && <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500"><Edit2 size={14} /></button>}
-                                                {currentUser?.isAdmin && <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>}
-                                            </div>
-                                        )}
                                     </div>
-                                    
-                                    {risk.driverReportDetails ? (
-                                        <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
-                                            <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
-                                                <div className="flex items-center gap-1 text-gray-700 col-span-2 font-bold"><Bus size={12}/> Reportado por: {risk.driverReportDetails.conductorName}</div>
-                                                <div className="flex items-center gap-1 text-gray-700"><b>Línea:</b> {risk.driverReportDetails.linea}</div>
-                                                <div className="flex items-center gap-1 text-gray-700"><b>U.:</b> {risk.driverReportDetails.unidad}</div>
-                                                <div className="flex items-center gap-1 text-gray-700 col-span-2"><Navigation size={12}/> <b>Sentido:</b> {risk.driverReportDetails.sentido}</div>
-                                            </div>
-                                            <div className="text-xs space-y-1 mb-2">
-                                                {risk.driverReportDetails.ubicacionManual && <p><b>Ubicación Manual:</b> {risk.driverReportDetails.ubicacionManual}</p>}
-                                                <p className="flex items-center gap-1 text-red-600 font-bold"><ShieldAlert size={12}/> {risk.driverReportDetails.huboDesvio ? 'Desvío Activado' : 'Sin Desvío'}</p>
-                                                {risk.driverReportDetails.rutaAlternativa && <p className="text-gray-600 ml-4">Ruta: {risk.driverReportDetails.rutaAlternativa}</p>}
-                                                {risk.driverReportDetails.velocidadSugerida && <p className="text-yellow-600 font-medium">Velocidad Precautoria: {risk.driverReportDetails.velocidadSugerida} km/h</p>}
-                                                {risk.driverReportDetails.carrilRecomendado && <p className="text-sky-600 font-medium">Carril: {risk.driverReportDetails.carrilRecomendado}</p>}
-                                            </div>
-                                            {risk.description && <div className="bg-white p-2 rounded text-xs text-gray-700 italic border border-gray-200">"{risk.description}"</div>}
-                                        </div>
-                                    ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
-                                   
-                                    <div className="flex gap-2 items-center mb-2">
-                                        {Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
-                                        {risk.videoUrl && <a href={risk.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-sky-500"><Video size={20} /></a>}
-                                        {risk.driveUrl && <a href={risk.driveUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-green-500"><Folder size={20} /></a>}
-                                    </div>
-
-                                    {Array.isArray(associatedRoutes) && associatedRoutes.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t">
-                                            <h4 className="font-semibold text-sm text-gray-800">Recorridos Afectados:</h4>
-                                            <ul className="list-disc list-inside text-xs text-gray-600 max-h-24 overflow-y-auto">{associatedRoutes.map(r => <li key={r.id}>{r.name}</li>)}</ul>
+                                    {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
+                                        <div className="flex gap-1 ml-2">
+                                            {!risk.driverReportDetails && <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500"><Edit2 size={14} /></button>}
+                                            {currentUser?.isAdmin && <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>}
                                         </div>
                                     )}
-                                </Popup>
-                            </Marker>
-                        )
-                    })}
-
-                    {/* MARCADORES PARA LOS SINIESTROS IRAM SOLO EN SU PESTAÑA */}
-                    {activeTab === 'siniestros' && Array.isArray(siniestros) && siniestros.map(sin => {
-                        if (!sin.ubicacion?.lat || !sin.ubicacion?.lng) return null;
-                        const icon = createRiskIcon('#ef4444'); 
-                        return (
-                            <Marker key={`iram-${sin.id}`} position={[sin.ubicacion.lat, sin.ubicacion.lng]} icon={icon}>
-                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro IRAM</Tooltip>
-                                <Popup>
-                                    <div className="min-w-[250px]">
-                                        <div className="font-bold text-lg leading-tight text-red-600">Reporte Siniestro IRAM</div>
-                                        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">{new Date(sin.fechaHora).toLocaleString('es-AR')}</div>
-                                        
-                                        <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
-                                            <p className="text-xs text-gray-800"><b>Línea:</b> {sin.conductor?.linea} | <b>Interno:</b> {sin.conductor?.interno}</p>
-                                            <p className="text-xs text-gray-800"><b>Conductor:</b> {sin.conductor?.nombre}</p>
-                                            <p className="text-xs text-gray-800 mt-1"><b>Tipo:</b> {sin.descripcion?.tipo}</p>
-                                            <p className="text-xs text-red-600 font-bold">Gravedad: {sin.descripcion?.gravedad}</p>
+                                </div>
+                                
+                                {risk.driverReportDetails ? (
+                                    <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
+                                        <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
+                                            <div className="flex items-center gap-1 text-gray-700 col-span-2 font-bold"><Bus size={12}/> Reportado por: {risk.driverReportDetails.conductorName}</div>
+                                            <div className="flex items-center gap-1 text-gray-700"><b>Línea:</b> {risk.driverReportDetails.linea}</div>
+                                            <div className="flex items-center gap-1 text-gray-700"><b>U.:</b> {risk.driverReportDetails.unidad}</div>
+                                            <div className="flex items-center gap-1 text-gray-700 col-span-2"><Navigation size={12}/> <b>Sentido:</b> {risk.driverReportDetails.sentido}</div>
                                         </div>
-                                        {sin.driveUrl && (
-                                            <div className="mt-2"><a href={sin.driveUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"><Folder size={14}/> Ver Carpeta Drive</a></div>
-                                        )}
+                                        <div className="text-xs space-y-1 mb-2">
+                                            {risk.driverReportDetails.ubicacionManual && <p><b>Ubicación Manual:</b> {risk.driverReportDetails.ubicacionManual}</p>}
+                                            <p className="flex items-center gap-1 text-red-600 font-bold"><ShieldAlert size={12}/> {risk.driverReportDetails.huboDesvio ? 'Desvío Activado' : 'Sin Desvío'}</p>
+                                            {risk.driverReportDetails.rutaAlternativa && <p className="text-gray-600 ml-4">Ruta: {risk.driverReportDetails.rutaAlternativa}</p>}
+                                            {risk.driverReportDetails.velocidadSugerida && <p className="text-yellow-600 font-medium">Velocidad Precautoria: {risk.driverReportDetails.velocidadSugerida} km/h</p>}
+                                            {risk.driverReportDetails.carrilRecomendado && <p className="text-sky-600 font-medium">Carril: {risk.driverReportDetails.carrilRecomendado}</p>}
+                                        </div>
+                                        {risk.description && <div className="bg-white p-2 rounded text-xs text-gray-700 italic border border-gray-200">"{risk.description}"</div>}
                                     </div>
-                                </Popup>
-                            </Marker>
-                        );
-                    })}
+                                ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
+                               
+                                <div className="flex gap-2 items-center mb-2">
+                                    {Array.isArray(risk.images) && risk.images.length > 0 && risk.images.map((img, idx) => img && <a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Adjunto" className="w-10 h-10 object-cover rounded border border-gray-300 hover:border-sky-500" /></a>)}
+                                    {risk.videoUrl && <a href={risk.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-sky-500"><Video size={20} /></a>}
+                                    {risk.driveUrl && <a href={risk.driveUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded border border-gray-300 text-gray-600 hover:text-green-500"><Folder size={20} /></a>}
+                                </div>
 
-                    {newRiskPosition && activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
-                </MapContainer>
-                
-                {/* MODAL DE SINIESTROS MANUALES */}
-                {isAddSiniestroModalOpen && newSiniestroPosition && (
-                    <div className="fixed inset-0 bg-black/80 z-[9999] flex items-start justify-center overflow-y-auto p-4 sm:p-6">
-                        <div className="relative w-full max-w-lg my-4 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700">
-                            <SiniestroForm 
-                                initialPosition={newSiniestroPosition}
-                                onCancel={() => { setIsAddSiniestroModalOpen(false); setNewSiniestroPosition(null); }}
-                                onSaveSiniestro={async (sin) => {
-                                    setSiniestros(prev => [...prev, sin]);
-                                    await saveSiniestroToDB(sin);
-                                    sendSiniestroTelegramNotification(sin);
-                                    setIsAddSiniestroModalOpen(false);
-                                    setNewSiniestroPosition(null);
-                                }}
-                            />
-                        </div>
+                                {Array.isArray(associatedRoutes) && associatedRoutes.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t">
+                                        <h4 className="font-semibold text-sm text-gray-800">Recorridos Afectados:</h4>
+                                        <ul className="list-disc list-inside text-xs text-gray-600 max-h-24 overflow-y-auto">{associatedRoutes.map(r => <li key={r.id}>{r.name}</li>)}</ul>
+                                    </div>
+                                )}
+                            </Popup>
+                        </Marker>
+                    )
+                })}
+
+                {/* MARCADORES PARA LOS SINIESTROS IRAM SOLO EN SU PESTAÑA */}
+                {activeTab === 'siniestros' && Array.isArray(siniestros) && siniestros.map(sin => {
+                    if (!sin.ubicacion?.lat || !sin.ubicacion?.lng) return null;
+                    const icon = createRiskIcon('#ef4444'); 
+                    return (
+                        <Marker key={`iram-${sin.id}`} position={[sin.ubicacion.lat, sin.ubicacion.lng]} icon={icon}>
+                            <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro IRAM</Tooltip>
+                            <Popup>
+                                <div className="min-w-[250px]">
+                                    <div className="font-bold text-lg leading-tight text-red-600">Reporte Siniestro IRAM</div>
+                                    <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">{new Date(sin.fechaHora).toLocaleString('es-AR')}</div>
+                                    
+                                    <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
+                                        <p className="text-xs text-gray-800"><b>Línea:</b> {sin.conductor?.linea} | <b>Interno:</b> {sin.conductor?.interno}</p>
+                                        <p className="text-xs text-gray-800"><b>Conductor:</b> {sin.conductor?.nombre}</p>
+                                        <p className="text-xs text-gray-800 mt-1"><b>Tipo:</b> {sin.descripcion?.tipo}</p>
+                                        <p className="text-xs text-red-600 font-bold">Gravedad: {sin.descripcion?.gravedad}</p>
+                                    </div>
+                                    {sin.driveUrl && (
+                                        <div className="mt-2"><a href={sin.driveUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"><Folder size={14}/> Ver Carpeta Drive</a></div>
+                                    )}
+                                </div>
+                            </Popup>
+                        </Marker>
+                    );
+                })}
+
+                {newRiskPosition && activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
+            </MapContainer>
+            
+            {/* MODAL DE SINIESTROS MANUALES */}
+            {isAddSiniestroModalOpen && newSiniestroPosition && (
+                <div className="fixed inset-0 bg-black/80 z-[9999] flex items-start justify-center overflow-y-auto p-4 sm:p-6">
+                    <div className="relative w-full max-w-lg my-4 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700">
+                        <SiniestroForm 
+                            initialPosition={newSiniestroPosition}
+                            onCancel={() => { setIsAddSiniestroModalOpen(false); setNewSiniestroPosition(null); }}
+                            onSaveSiniestro={async (sin) => {
+                                setSiniestros(prev => [...prev, sin]);
+                                await saveSiniestroToDB(sin);
+                                sendSiniestroTelegramNotification(sin);
+                                setIsAddSiniestroModalOpen(false);
+                                setNewSiniestroPosition(null);
+                            }}
+                        />
                     </div>
-                )}
-            </main>
-           
+                </div>
+            )}
+
             {isAddRiskModalOpen && newRiskPosition && <RiskModal riskTypes={riskTypes} onClose={() => setIsAddRiskModalOpen(false)} onSave={(...args) => handleSaveRisk(uuidv4(), ...args, false)} />}
             {editingRisk && <RiskModal riskTypes={riskTypes} editingRisk={editingRisk} onClose={() => setEditingRisk(null)} onSave={(...args) => handleSaveRisk(editingRisk.id, ...args, true)} />}
         </Panel>
