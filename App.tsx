@@ -26,7 +26,7 @@ import {
 const SAN_RAFAEL_CENTER: LatLngExpression =[-34.6175, -68.335];
 
 const createRiskIcon = (color: string) => {
-    return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="32" height="32"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -30] });
+    return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="32" height="32"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`)}`, iconSize:[32, 32], iconAnchor:[16, 32], popupAnchor:[0, -32] });
 };
 
 const MapFixer = () => {
@@ -57,21 +57,21 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     return false;
 };
 
-const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: Siniestro[], activeTab?: string }> = ({ routes, risks, siniestros, activeTab }) => {
+const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[] }> = ({ routes, risks }) => {
     const map = useMap();
     useEffect(() => {
         const points: LatLngExpression[] =[];
         if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features && Array.isArray(r.geoJson.features)) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
         if (Array.isArray(risks)) risks.forEach(r => { if (r?.position?.lat && r?.position?.lng) points.push([r.position.lat, r.position.lng]); });
-        if (activeTab === 'siniestros' && Array.isArray(siniestros)) { siniestros.forEach(s => { if (s?.ubicacion?.lat && s?.ubicacion?.lng) points.push([s.ubicacion.lat, s.ubicacion.lng]); }); }
         if (Array.isArray(points) && points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
-    },[routes, risks, siniestros, activeTab, map]);
+    },[routes, risks, map]);
     return null;
 };
 
 const App: React.FC = () => {
     const[isLoadingData, setIsLoadingData] = useState(true);
+    
     const[currentUser, setCurrentUser] = useState<User | null>(() => { const s = localStorage.getItem('currentUser'); return s ? JSON.parse(s) : null; });
     const[currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
 
@@ -84,16 +84,17 @@ const App: React.FC = () => {
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
     const[users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
-    const[risks, setRisks] = useState<Risk[]>([]);
+    const [risks, setRisks] = useState<Risk[]>([]);
     const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const[showAllRoutes, setShowAllRoutes] = useState(true); 
+    const [showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
@@ -125,7 +126,7 @@ const App: React.FC = () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const publicRouteId = urlParams.get('publicRoute');
-    const expireParam = urlParams.get('expire'); 
+    const expireParam = urlParams.get('expire');
     const isDriverMode = urlParams.get('mode') === 'driver';
     const isSiniestroMode = urlParams.get('mode') === 'siniestro';
 
@@ -145,7 +146,7 @@ const App: React.FC = () => {
                         dbRiskTypes.push(incType); saveRiskTypeToDB(incType).catch(()=>{});
                     }
                     if (!dbRiskTypes.find(rt => rt.id === 'novedad-ruta')) {
-                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false };
+                        const novType = { id: 'novedad-ruta', name: 'Novedad en Ruta', color: '#000000', isIncident: false }; 
                         dbRiskTypes.push(novType); saveRiskTypeToDB(novType).catch(()=>{});
                     }
                     setRiskTypes(dbRiskTypes); prevRiskTypesRef.current = dbRiskTypes; 
@@ -180,6 +181,7 @@ const App: React.FC = () => {
         initData();
     },[]);
 
+    // Sincronizaciones DB y LocalStorage
     useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
@@ -265,11 +267,13 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
+    // OBTENEMOS LOS RIESGOS MANUALES DE MAPA QUE SON SINIESTROS PARA PASAR AL PANEL
     const incidentRisks = useMemo(() => Array.isArray(risks) ? risks.filter(r => {
         const rt = riskTypes.find(t => t.id === r.riskTypeId);
         return rt && rt.isIncident && !r.driverReportDetails;
     }) : [], [risks, riskTypes]);
 
+    // FUNCIONES TELEGRAM
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
         const d = risk.driverReportDetails; if (!d) return;
@@ -304,14 +308,14 @@ const App: React.FC = () => {
 
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
-    const handleMapClick = useCallback((latlng: LatLng) => { 
-        const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]; 
+    const handleMapClick = useCallback((latlng: LatLng) => {
+        const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[];
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { 
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); 
         } else if (activeTab === 'siniestros' && allowedTabs.includes('siniestros')) {
             setNewSiniestroPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddSiniestroModalOpen(true);
         }
-    },[activeTab, currentUser]);
+    }, [activeTab, currentUser]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
@@ -342,7 +346,11 @@ const App: React.FC = () => {
 
                 setRoutes(prev =>[...prev, newRoute]);
                 setRisks(prevRisks => prevRisks.map(risk => isPointNearRoute(risk.position, finalGeoJson as any, proximityDistance) ? { ...risk, associatedRouteIds:[...new Set([...(Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds : []), newRoute.id])] } : risk));
-            } catch (error) { alert("Error al procesar el archivo KML. Verifique que sea un formato válido."); }
+
+            } catch (error) {
+                console.error(error);
+                alert("Error al procesar el archivo KML. Verifique que sea un formato válido.");
+            }
         };
         reader.readAsText(kmlFile);
     }, [proximityDistance]);
@@ -355,14 +363,14 @@ const App: React.FC = () => {
         
         if (risk.isVisibleOnMap === false) return false;
 
-        if (activeTab === 'siniestros') return false; 
-
         if (activeTab === 'novedades') {
             if (!risk.driverReportDetails) return false;
             if (novedadesFilterLine && !risk.driverReportDetails.linea.toLowerCase().includes(novedadesFilterLine.toLowerCase())) return false;
             if (novedadesFilterDate && risk.timestamp && new Date(risk.timestamp).toISOString().split('T')[0] !== novedadesFilterDate) return false;
             return true;
         }
+
+        if (activeTab === 'siniestros') return false; 
 
         if (activeTab === 'routes') {
             if (rt.isIncident && !showIncidents) return false;
@@ -549,6 +557,7 @@ const App: React.FC = () => {
                     )
                 })}
 
+                {/* MARCADORES PARA LOS SINIESTROS IRAM SOLO EN SU PESTAÑA */}
                 {activeTab === 'siniestros' && Array.isArray(siniestros) && siniestros.map(sin => {
                     if (!sin.ubicacion?.lat || !sin.ubicacion?.lng) return null;
                     const icon = createRiskIcon('#ef4444'); 
@@ -578,7 +587,7 @@ const App: React.FC = () => {
                 {newRiskPosition && activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
             </MapContainer>
             
-            {/* MODAL DE SINIESTROS MANUAALES */}
+            {/* MODAL DE SINIESTROS MANUALES */}
             {isAddSiniestroModalOpen && newSiniestroPosition && (
                 <div className="fixed inset-0 bg-black/80 z-[9999] flex items-start justify-center overflow-y-auto p-4 sm:p-6">
                     <div className="relative w-full max-w-lg my-4 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700">

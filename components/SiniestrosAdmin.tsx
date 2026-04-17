@@ -99,7 +99,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                                     {(Array.isArray(sin.images) && sin.images.length > 0) && (<div><h4 className="text-sky-400 font-bold mb-2 border-b border-gray-700 pb-1">Fotografías ({sin.images.length})</h4><div className="grid grid-cols-3 gap-2">{sin.images.map((img, idx) => (<a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Siniestro" className="w-full h-16 object-cover rounded border border-gray-600 hover:border-sky-500" /></a>))}</div></div>)}
                                     {sin.driveUrl && (<div className="pt-2"><a href={sin.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-xs"><Folder size={16}/> Carpeta Externa Drive</a></div>)}
                                 </div>
-                            )}
+                            ))
                         </div>
                     ))
                 )}
