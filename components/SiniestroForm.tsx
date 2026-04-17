@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { ShieldAlert, MapPin, Camera, CheckCircle, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ShieldAlert, MapPin, Camera, CheckCircle, ExternalLink, Trash2, Image as ImageIcon, X } from 'lucide-react';
 import type { Siniestro, Consecuencia } from '../types';
 import { uploadSiniestroImage } from '../lib/firebase';
 
-interface SiniestroFormProps { onSaveSiniestro: (sin: Siniestro) => Promise<void>; }
+interface SiniestroFormProps { 
+    onSaveSiniestro: (sin: Siniestro) => Promise<void>; 
+    initialPosition?: { lat: number; lng: number; }; // Para carga en mapa
+    onCancel?: () => void; // Para cerrar modal
+}
 
 const CLIMAS =['Niebla', 'Resplandor Solar', 'Lluvia', 'Nieve', 'Granizo', 'Calor extremo', 'Viento Zonda', 'Polvo en suspensión'];
 const CAMINOS =['Asfalto Rugoso', 'Hielo Negro', 'Obra Vial', 'Ripio', 'Serruchos', 'Guardaganado', 'Badén', 'Animales Sueltos', 'Arena en Ruta'];
@@ -16,12 +20,12 @@ const CONSECUENCIAS_DEFAULT: Consecuencia[] =[
     { tipo: 'Lesionados No Transportados', activa: false, cantidad: '' }
 ];
 
-export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro }) => {
-    const [step, setStep] = useState(1);
+export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, onCancel }) => {
+    const[step, setStep] = useState(1);
     const[isSubmitting, setIsSubmitting] = useState(false);
-    const[uploadProgress, setUploadProgress] = useState("");
+    const [uploadProgress, setUploadProgress] = useState("");
     const[gpsPosition, setGpsPosition] = useState<{lat: number, lng: number}|null>(null);
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const[selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
     const[f, setF] = useState({
         fechaHora: new Date().toISOString().slice(0,16), ubicacionManual: '', lugar: 'Ciudad',
@@ -35,14 +39,18 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
     });
 
     useEffect(() => {
-        navigator.geolocation.getCurrentPosition(
-            pos => setGpsPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => console.warn("GPS no disponible"), { enableHighAccuracy: true }
-        );
-    },[]);
+        if (initialPosition) {
+            setGpsPosition(initialPosition);
+        } else {
+            navigator.geolocation.getCurrentPosition(
+                pos => setGpsPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                () => console.warn("GPS no disponible"), { enableHighAccuracy: true }
+            );
+        }
+    },[initialPosition]);
 
     const handleChange = (e: any) => setF({ ...f, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev =>[...prev, ...Array.from(e.target.files!)]); };
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
     const removeFile = (index: number) => setSelectedFiles(prev => prev.filter((_, i) => i !== index));
 
     const toggleArray = (arrayName: 'climas' | 'caminos', item: string) => {
@@ -90,28 +98,37 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
     };
 
     if (step === 2) return (
-        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-gray-900 text-white flex flex-col items-center justify-center p-10 text-center h-full min-h-[50vh]">
             <CheckCircle size={80} className="text-green-500 mb-4" />
             <h1 className="text-2xl font-bold mb-2">Denuncia Registrada</h1>
-            <p className="text-gray-400 mb-6">El siniestro ha sido enviado exitosamente.</p>
-            <button onClick={() => window.location.reload()} className="bg-sky-600 px-6 py-3 rounded-lg font-bold">Volver al Inicio</button>
+            <p className="text-gray-400 mb-6">El siniestro y las fotos han sido enviados exitosamente.</p>
+            <button onClick={onCancel ? onCancel : () => window.location.reload()} className="bg-sky-600 hover:bg-sky-500 px-6 py-3 rounded-lg font-bold transition-colors">
+                {onCancel ? 'Cerrar Ventana' : 'Volver al Inicio'}
+            </button>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white pb-32">
-            <div className="bg-red-600 p-4 sticky top-0 z-50 shadow-lg">
-                <h1 className="text-xl font-bold flex items-center gap-2"><ShieldAlert /> Reporte de Siniestro</h1>
-                <p className="text-xs opacity-90">Protocolo IRAM 3810 - Emergencias</p>
+        <div className={`bg-gray-900 text-white flex flex-col relative ${onCancel ? 'h-[85vh]' : 'min-h-screen'}`}>
+            <div className="bg-red-600 p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center flex-shrink-0">
+                <div>
+                    <h1 className="text-xl font-bold flex items-center gap-2"><ShieldAlert /> Reporte de Siniestro</h1>
+                    <p className="text-xs opacity-90">Protocolo IRAM 3810 - Emergencias</p>
+                </div>
+                {onCancel && (
+                    <button type="button" onClick={onCancel} className="text-white hover:text-red-200 transition-colors p-1 rounded-full bg-red-700">
+                        <X size={20} />
+                    </button>
+                )}
             </div>
 
-            <div className="p-4 space-y-6 max-w-md mx-auto">
-                {/* 1. INFO GENERAL */}
+            <div className="p-4 space-y-6 w-full max-w-lg mx-auto overflow-y-auto flex-1">
+                {/* SECCION 1 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">1. Información General</h2>
                     <div className="space-y-3">
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase">Fecha y Hora</span><input type="datetime-local" name="fechaHora" value={f.fechaHora} onChange={handleChange} required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none" /></label>
-                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-900/50 p-2 rounded"><MapPin size={14}/> {gpsPosition ? <span className="text-green-400 font-bold">Ubicación GPS Obtenida</span> : <span className="animate-pulse">Buscando GPS...</span>}</div>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-900/50 p-2 rounded"><MapPin size={14}/> {gpsPosition ? <span className="text-green-400 font-bold">Ubicación Capturada</span> : <span className="animate-pulse">Buscando...</span>}</div>
                         <input type="text" name="ubicacionManual" value={f.ubicacionManual} onChange={handleChange} placeholder="Calle/Intersección/KM..." required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm" />
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase font-bold">ZONA:</span>
                             <select name="lugar" value={f.lugar} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm"><option value="Ciudad">Ciudad</option><option value="Rural">Rural</option><option value="Terminal">Terminal</option><option value="Base">Base</option></select>
@@ -141,7 +158,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     </div>
                 </div>
 
-                {/* 2. CONDUCTOR */}
+                {/* SECCION 2 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">2. Conductor y Unidad</h2>
                     <div className="space-y-3">
@@ -154,7 +171,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     </div>
                 </div>
 
-                {/* 3. DESCRIPCION */}
+                {/* SECCION 3 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">3. Descripción</h2>
                     <select name="descTipo" value={f.descTipo} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 mb-3 text-sm">
@@ -187,10 +204,17 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     </select>
                 </div>
 
-                {/* 4. DATOS COMPLEMENTARIOS (AHORA EL 4) */}
+                {/* SECCION 4 */}
+                <div className="bg-blue-900/30 p-4 rounded-xl border border-blue-500/50 shadow-md">
+                    <h2 className="font-bold text-blue-400 mb-3 border-b border-blue-500/30 pb-1 uppercase text-xs tracking-wider">4. Deslinde de Atención Médica</h2>
+                    <p className="text-[11px] text-blue-200/70 mb-4">Si el pasajero o tercero manifiesta no requerir atención médica inmediata, debe completar el formulario.</p>
+                    <a href="https://deslinde-responsabilidad.vercel.app/" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg">Acceder al Formulario <ExternalLink size={18} /></a>
+                </div>
+
+                {/* SECCION 5 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <div className="flex justify-between items-center mb-3 border-b border-gray-700 pb-1">
-                        <h2 className="font-bold text-sky-400 uppercase text-xs tracking-wider">4. Datos Complementarios</h2>
+                        <h2 className="font-bold text-sky-400 uppercase text-xs tracking-wider">5. Datos Complementarios</h2>
                         <input type="checkbox" name="tercInvolucrado" checked={f.tercInvolucrado} onChange={handleChange} className="w-6 h-6 rounded bg-gray-900 border-gray-600 text-sky-500 focus:ring-0" />
                     </div>
                     {f.tercInvolucrado && (
@@ -220,51 +244,32 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro })
                     )}
                 </div>
 
-                {/* 5. FOTOGRAFIAS (AHORA EL 5) */}
-                <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">5. Fotografías del Hecho</h2>
+                {/* SECCION 6 */}
+                <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md pb-8">
+                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">6. Fotografías del Hecho</h2>
                     <p className="text-[11px] text-gray-400 mb-4 italic">Suba fotos de: daños propios, daños terceros, posición de vehículos (TOME FOTOS PANORÁMICAS) y documentos (TOME FOTOS ENFOCADAS Y CLARAS).</p>
-                    
                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors bg-gray-900/50">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <Camera size={32} className="text-sky-500 mb-2" />
-                            <p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p>
-                        </div>
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6"><Camera size={32} className="text-sky-500 mb-2" /><p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p></div>
                         <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileSelect} />
                     </label>
-
                     {selectedFiles.length > 0 && (
                         <div className="mt-4 grid grid-cols-2 gap-2">
                             {selectedFiles.map((file, index) => (
                                 <div key={index} className="relative bg-gray-900 p-2 rounded border border-gray-700 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <ImageIcon size={14} className="text-gray-500 flex-shrink-0" />
-                                        <span className="text-[10px] truncate text-gray-300">{file.name}</span>
-                                    </div>
-                                    <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-400 p-1">
-                                        <Trash2 size={14} />
-                                    </button>
+                                    <div className="flex items-center gap-2 overflow-hidden"><ImageIcon size={14} className="text-gray-500 flex-shrink-0" /><span className="text-[10px] truncate text-gray-300">{file.name}</span></div>
+                                    <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-400 p-1"><Trash2 size={14} /></button>
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
+            </div>
 
-                <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-                    <h2 className="text-[10px] font-bold text-gray-500 uppercase mb-2 italic">Opcional: Carpeta Drive Externa</h2>
-                    <input type="url" name="driveUrl" value={f.driveUrl} onChange={handleChange} placeholder="Link de carpeta externa (si posee)" className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-xs opacity-60" />
-                </div>
-
-                <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-50">
-                    <button 
-                        type="submit" 
-                        disabled={isSubmitting} 
-                        className={`w-full ${isSubmitting ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-500'} text-white font-bold text-lg py-4 rounded-xl shadow-lg flex flex-col items-center justify-center transition-all active:scale-95`}
-                    >
-                        <span>{isSubmitting ? 'PROCESANDO...' : 'REGISTRAR SINIESTRO'}</span>
-                        {isSubmitting && <span className="text-[10px] font-normal animate-pulse">{uploadProgress}</span>}
-                    </button>
-                </div>
+            <div className="sticky bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-50 flex-shrink-0">
+                <button type="submit" onClick={handleSubmit} disabled={isSubmitting} className={`w-full ${isSubmitting ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-500'} text-white font-bold text-lg py-4 rounded-xl shadow-lg flex flex-col items-center justify-center transition-all active:scale-95`}>
+                    <span>{isSubmitting ? 'PROCESANDO...' : 'REGISTRAR SINIESTRO'}</span>
+                    {isSubmitting && <span className="text-[10px] font-normal animate-pulse">{uploadProgress}</span>}
+                </button>
             </div>
         </div>
     );
