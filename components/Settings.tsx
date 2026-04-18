@@ -16,7 +16,7 @@ export const Settings: React.FC<SettingsProps> = ({
     telegramToken, setTelegramToken, telegramChatId, setTelegramChatId,
     routes, groupColors, setGroupColors
 }) => {
-    const uniqueGroups = Array.from(new Set(routes.map(r => r.group).filter(Boolean))).sort();
+    const uniqueGroups: string[] = Array.from(new Set(routes.map(r => r.group).filter((g): g is string => Boolean(g)))).sort() as string[];
 
     const handleColorChange = (group: string, color: string) => {
         setGroupColors(prev => ({ ...prev, [group]: color }));

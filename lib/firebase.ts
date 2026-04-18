@@ -1,8 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
-import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
-import type { Route, Risk, RiskType, User, Siniestro } from '../types';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject, uploadBytes } from "firebase/storage";
+import type { Route, Risk, RiskType, User, Siniestro } from '../types';
 
 
 // 👇 PEGA AQUÍ TUS CLAVES DE FIREBASE 👇

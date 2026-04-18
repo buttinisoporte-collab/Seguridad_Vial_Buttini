@@ -21,7 +21,7 @@ export interface Siniestro {
     id: string; timestamp: number; fechaHora: string;
     ubicacion: { lat?: number; lng?: number; manual: string; lugar: string; };
     conductor: { nombre: string; legajo: string; interno: string; kilometraje: string; linea: string; };
-    descripcion: { tipo: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; };
+    descripcion: { tipo: string; gravedad?: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; };
     entorno: { climas: string[]; caminos: string[]; };
     datosComplementarios: { 
         nombreTercero: string; dniTercero: string; vehiculoTercero: string; patenteTercero: string; seguroTercero: string; polizaTercero: string;

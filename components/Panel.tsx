@@ -39,6 +39,8 @@ interface PanelProps {
     telegramChatId: string; setTelegramChatId: (v: string) => void;
     onUpdateRisk: (risk: Risk) => void;
     onUpdateSiniestro: (sin: Siniestro) => void;
+    onEditSiniestroFull?: (sin: Siniestro) => void;
+    onAddManualSiniestro?: () => void;
     groupColors: Record<string, string>; setGroupColors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     novedadesFilterDate: string; setNovedadesFilterDate: (v: string) => void;
     novedadesFilterLine: string; setNovedadesFilterLine: (v: string) => void;
@@ -52,7 +54,7 @@ export const Panel: React.FC<PanelProps> = ({
     proximityDistance, setProximityDistance, driverReportTTL, setDriverReportTTL, onAddRoute, getRiskType, activeTab, setActiveTab, showRisks, setShowRisks, showIncidents, setShowIncidents,
     filterGroup, setFilterGroup, filterLine, setFilterLine, filterService, setFilterService, activeRouteId, setActiveRouteId, reportSelectedRouteId, setReportSelectedRouteId,
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
-    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, onUpdateSiniestro, groupColors, setGroupColors,
+    telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, onUpdateSiniestro, onEditSiniestroFull, onAddManualSiniestro, groupColors, setGroupColors,
     novedadesFilterDate, setNovedadesFilterDate, novedadesFilterLine, setNovedadesFilterLine, showNovedadesRoutes, setShowNovedadesRoutes,
     selectedSiniestroId, setSelectedSiniestroId, showRiskViewerRoutes, setShowRiskViewerRoutes
 }) => {
@@ -63,7 +65,7 @@ export const Panel: React.FC<PanelProps> = ({
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} />;
             case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
-            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateSiniestro={onUpdateSiniestro} />;
+            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} risks={risks} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateSiniestro={onUpdateSiniestro} onEditSiniestroFull={onEditSiniestroFull} onAddManualSiniestro={onAddManualSiniestro} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
             case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
