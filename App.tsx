@@ -71,30 +71,30 @@ const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: 
 };
 
 const App: React.FC = () => {
-    const[isLoadingData, setIsLoadingData] = useState(true);
+    const [isLoadingData, setIsLoadingData] = useState(true);
     
     const[currentUser, setCurrentUser] = useState<User | null>(() => { const s = localStorage.getItem('currentUser'); return s ? JSON.parse(s) : null; });
     const[currentDriver, setCurrentDriver] = useState<User | null>(() => { const s = localStorage.getItem('currentDriver'); return s ? JSON.parse(s) : null; });
 
     const[activeTab, setActiveTab] = useState<AppTab>('routes');
-    const [showRisks, setShowRisks] = useState(true);
+    const[showRisks, setShowRisks] = useState(true);
     const[showIncidents, setShowIncidents] = useState(true);
     const[filterGroup, setFilterGroup] = useState('');
     const[filterLine, setFilterLine] = useState('');
-    const [filterService, setFilterService] = useState('');
+    const[filterService, setFilterService] = useState('');
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
     
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
-    const [users, setUsers] = useState<User[]>([]);
+    const[users, setUsers] = useState<User[]>([]);
     const[riskTypes, setRiskTypes] = useState<RiskType[]>([]);
     const[routes, setRoutes] = useState<Route[]>([]);
     const [risks, setRisks] = useState<Risk[]>([]);
-    const [siniestros, setSiniestros] = useState<Siniestro[]>([]);
+    const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
-    const [proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
+    const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const[showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
@@ -110,7 +110,7 @@ const App: React.FC = () => {
 
     useEffect(() => { localStorage.setItem('tg_token', telegramToken); },[telegramToken]);
     useEffect(() => { localStorage.setItem('tg_chat', telegramChatId); },[telegramChatId]);
-    useEffect(() => { localStorage.setItem('groupColors', JSON.stringify(groupColors)); }, [groupColors]);
+    useEffect(() => { localStorage.setItem('groupColors', JSON.stringify(groupColors)); },[groupColors]);
 
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
@@ -125,9 +125,9 @@ const App: React.FC = () => {
     const prevUsersRef = useRef<User[]>([]);
     const prevSiniestrosRef = useRef<Siniestro[]>([]);
 
-    const urlParams = newSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(window.location.search);
     const publicRouteId = urlParams.get('publicRoute');
-    const expireParam = urlParams.get('expire'); 
+    const expireParam = urlParams.get('expire');
     const isDriverMode = urlParams.get('mode') === 'driver';
     const isSiniestroMode = urlParams.get('mode') === 'siniestro';
 
@@ -268,13 +268,12 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
-    // OBTENEMOS LOS RIESGOS MANUALES DE MAPA QUE SON SINIESTROS PARA PASAR AL PANEL
     const incidentRisks = useMemo(() => Array.isArray(risks) ? risks.filter(r => {
         const rt = Array.isArray(riskTypes) ? riskTypes.find(t => t.id === r.riskTypeId) : undefined;
         return rt && rt.isIncident && !r.driverReportDetails;
     }) : [], [risks, riskTypes]);
 
-    // FUNCIONES TELEGRAM
+    // TELEGRAM
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
         const d = risk.driverReportDetails; if (!d) return;
@@ -491,7 +490,7 @@ const App: React.FC = () => {
                         if (route?.geoJson && Array.isArray(route.geoJson.features)) {
                             route.geoJson.features.forEach(feature => { 
                                 if (feature?.geometry?.type === 'LineString' && Array.isArray(feature.geometry.coordinates)) {
-                                    const validSegment = feature.geometry.coordinates.filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number').map((c: any) =>[c[1], c[0]] as LatLngExpression);
+                                    const validSegment = feature.geometry.coordinates.filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number').map((c: any) => [c[1], c[0]] as LatLngExpression);
                                     if (validSegment.length > 0) path.push(validSegment);
                                 }
                             });
@@ -613,7 +612,8 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 )}
-        </Panel>
+            </Panel>
+        </div>
     );
 };
 export default App;
