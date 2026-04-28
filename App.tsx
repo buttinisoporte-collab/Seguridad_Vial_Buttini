@@ -95,7 +95,7 @@ const App: React.FC = () => {
     const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
     
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
-    const[showAllRoutes, setShowAllRoutes] = useState(true); 
+    const [showAllRoutes, setShowAllRoutes] = useState(true); 
     const[showRiskViewerRoutes, setShowRiskViewerRoutes] = useState(false);
     const[driverReportTTL, setDriverReportTTL] = useState<number>(() => Number(localStorage.getItem('driverReportTTL')) || 12);
     
@@ -268,12 +268,13 @@ const App: React.FC = () => {
         return associatedIds;
     },[routes, proximityDistance]);
 
+    // OBTENEMOS LOS RIESGOS MANUALES DE MAPA QUE SON SINIESTROS
     const incidentRisks = useMemo(() => Array.isArray(risks) ? risks.filter(r => {
         const rt = Array.isArray(riskTypes) ? riskTypes.find(t => t.id === r.riskTypeId) : undefined;
         return rt && rt.isIncident && !r.driverReportDetails;
     }) : [], [risks, riskTypes]);
 
-    // TELEGRAM
+    // FUNCIONES TELEGRAM
     const sendTelegramNotification = async (risk: Risk) => {
         if (!telegramToken || !telegramChatId) return;
         const d = risk.driverReportDetails; if (!d) return;
@@ -410,7 +411,7 @@ const App: React.FC = () => {
                 if ((sin as any).associatedRouteId) return routes.filter(r => r.id === (sin as any).associatedRouteId);
                 return routes.filter(r => r.line === sin.conductor?.linea);
             }
-            if (manualRisk) return routes.filter(r => (Array.isArray(manualRisk.associatedRouteIds) ? manualRisk.associatedRouteIds : []).includes(r.id));
+            if (manualRisk) return routes.filter(r => (Array.isArray(manualRisk.associatedRouteIds) ? manualRisk.associatedRouteIds :[]).includes(r.id));
             return[];
         }
         return routes;
@@ -456,7 +457,7 @@ const App: React.FC = () => {
     if (isLoadingData) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-sky-500 mb-4"></div><h1 className="text-xl font-bold text-sky-400">Iniciando Sistema Seguro...</h1></div>;
 
     return (
-        <div className="flex h-screen w-screen bg-gray-100 font-sans">
+        <div className="flex flex-col h-screen w-screen bg-slate-100 font-sans overflow-hidden">
             <Panel
                 currentUser={currentUser!} onLogout={handleLogout} users={users} setUsers={setUsers}
                 riskTypes={riskTypes} setRiskTypes={setRiskTypes} routes={routes} setRoutes={setRoutes} 
@@ -477,11 +478,12 @@ const App: React.FC = () => {
                 showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
                 selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId}
                 showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes}
+                onAddNewSiniestro={() => setIsAddSiniestroModalOpen(true)}
             >
                 <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
                     <MapFixer />
                     <MapFocusUpdater focusPosition={focusPosition} />
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
                     <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} />
                     {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes(activeTab) && <MapClickHandler onMapClick={handleMapClick} />}
 
@@ -563,7 +565,28 @@ const App: React.FC = () => {
                         )
                     })}
 
-                    {/* MARCADORES PARA LOS SINIESTROS IRAM SOLO EN SU PESTAÑA */}
+                    {/* MARCADORES PARA LOS SINIESTROS MANUALES E IRAM EN SU PESTAÑA */}
+                    {activeTab === 'siniestros' && Array.isArray(incidentRisks) && incidentRisks.map(risk => {
+                        if (!risk?.position || typeof risk.position.lat !== 'number' || typeof risk.position.lng !== 'number') return null;
+                        const rt = getRiskType(risk.riskTypeId);
+                        const icon = createRiskIcon(rt?.color || '#f97316');
+                        return (
+                            <Marker key={`man-${risk.id}`} position={[risk.position.lat, risk.position.lng]} icon={icon}>
+                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-orange-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>{rt?.name || 'Siniestro'}</Tooltip>
+                                <Popup>
+                                    <div className="min-w-[250px]">
+                                        <div className="font-bold text-lg leading-tight" style={{ color: rt?.color }}>{rt?.name || 'Siniestro'}</div>
+                                        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">{risk.timestamp ? new Date(risk.timestamp).toLocaleString('es-AR') : 'Sin fecha (Use Editar)'}</div>
+                                        <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
+                                            <p className="text-xs text-gray-800 italic">"{risk.description}"</p>
+                                            <p className="text-xs text-red-600 font-bold mt-1">Gravedad: {risk.gravedad || 'No especificada'}</p>
+                                        </div>
+                                    </div>
+                                </Popup>
+                            </Marker>
+                        );
+                    })}
+
                     {activeTab === 'siniestros' && Array.isArray(siniestros) && siniestros.map(sin => {
                         if (!sin.ubicacion?.lat || !sin.ubicacion?.lng) return null;
                         const icon = createRiskIcon('#ef4444'); 
@@ -612,8 +635,8 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 )}
-            </Panel>
-        </div>
+            </main>
+        </Panel>
     );
 };
 export default App;

@@ -13,6 +13,7 @@ export interface Risk {
     id: string; position: Position; riskTypeId: string; description: string;
     associatedRouteIds: string[]; images: string[]; videoUrl?: string; driveUrl?: string;
     driverReportDetails?: DriverReportDetails; timestamp?: number; isVisibleOnMap?: boolean;
+    gravedad?: string; // NUEVO: Para guardar la gravedad en siniestros manuales
 }
 
 export interface Consecuencia { tipo: string; activa: boolean; cantidad: string; }
@@ -21,7 +22,7 @@ export interface Siniestro {
     id: string; timestamp: number; fechaHora: string;
     ubicacion: { lat?: number; lng?: number; manual: string; lugar: string; };
     conductor: { nombre: string; legajo: string; interno: string; kilometraje: string; linea: string; };
-    descripcion: { tipo: string; gravedad?: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; };
+    descripcion: { tipo: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; gravedad: string; };
     entorno: { climas: string[]; caminos: string[]; };
     datosComplementarios: { 
         nombreTercero: string; dniTercero: string; vehiculoTercero: string; patenteTercero: string; seguroTercero: string; polizaTercero: string;
@@ -29,7 +30,7 @@ export interface Siniestro {
     };
     images: string[];
     driveUrl?: string; 
-    associatedRouteId?: string; // NUEVO: Para asignar ruta manualmente
+    associatedRouteId?: string;
 }
 
 export interface GeoJSONFeature<T> { type: "Feature"; properties: any; geometry: T; }
