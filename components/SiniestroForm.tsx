@@ -34,8 +34,8 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
         condNombre: '', condLegajo: '', condInterno: '', condKm: '', condLinea: '',
         descTipo: 'Choque entre vehículos-Moto-Bicicletas', descResumen: '', 
         consecuencias: JSON.parse(JSON.stringify(CONSECUENCIAS_DEFAULT)) as Consecuencia[], 
-        descFactores: 'Factor Humano (error, descripción, velocidad)',
-        tercNombre: '', tercDNI: '', tercVehiculo: '', tercPatente: '', tercSeguro: '', tercPoliza: '',
+        descFactores: 'Factor Humano (error, descripción, velocidad)', gravedad: 'Leve',
+        tercInvolucrado: false, tercNombre: '', tercDNI: '', tercVehiculo: '', tercPatente: '', tercSeguro: '', tercPoliza: '',
         intervencionPolicial: false, hayTestigos: false, testigosInfo: '', driveUrl: ''
     });
 
@@ -85,7 +85,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 id: siniestroId, timestamp: Date.now(), fechaHora: f.fechaHora,
                 ubicacion: { lat: gpsPosition?.lat, lng: gpsPosition?.lng, manual: f.ubicacionManual, lugar: f.lugar },
                 conductor: { nombre: f.condNombre, legajo: f.condLegajo, interno: f.condInterno, kilometraje: f.condKm, linea: f.condLinea },
-                descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores },
+                descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores, gravedad: f.gravedad },
                 entorno: { climas: f.climas, caminos: f.caminos },
                 datosComplementarios: { 
                     nombreTercero: f.tercNombre, dniTercero: f.tercDNI, vehiculoTercero: f.tercVehiculo, patenteTercero: f.tercPatente, seguroTercero: f.tercSeguro, polizaTercero: f.tercPoliza,
@@ -189,6 +189,17 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 {/* SECCION 3 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">3. Descripción</h2>
+                    
+                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Gravedad del Siniestro</p>
+                    <select name="gravedad" value={f.gravedad} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 mb-3 text-sm">
+                        <option value="Leve">Leve</option>
+                        <option value="Moderado">Moderado</option>
+                        <option value="Grave">Grave</option>
+                        <option value="Solo daños materiales">Solo daños materiales</option>
+                        <option value="Fallecidos">Fallecidos</option>
+                    </select>
+
+                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Tipo de Siniestro</p>
                     <select name="descTipo" value={f.descTipo} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 mb-3 text-sm">
                         <option value="Choque entre vehículos-Moto-Bicicletas">Choque entre vehículos-Moto-Bicicletas</option>
                         <option value="Choque con objeto físico">Choque con objeto físico</option>

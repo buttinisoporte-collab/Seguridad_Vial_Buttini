@@ -84,6 +84,7 @@ const App: React.FC = () => {
     const[activeRouteId, setActiveRouteId] = useState<string | null>(null);
     const[reportSelectedRouteId, setReportSelectedRouteId] = useState<string>('');
     const[riskViewerSelectedTypes, setRiskViewerSelectedTypes] = useState<string[]>([]);
+    const[relocatingSiniestroId, setRelocatingSiniestroId] = useState<string | null>(null);
     const[focusPosition, setFocusPosition] = useState<Position | null>(null);
 
     const[users, setUsers] = useState<User[]>([]);
@@ -307,12 +308,37 @@ const App: React.FC = () => {
     
     const handleMapClick = useCallback((latlng: LatLng) => { 
         const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]; 
+
+        if (relocatingSiniestroId) {
+            const targetSin = siniestros.find(s => s.id === relocatingSiniestroId);
+            if (targetSin) {
+                const updatedSin = { ...targetSin, ubicacion: { ...targetSin.ubicacion, lat: latlng.lat, lng: latlng.lng } };
+                setSiniestros(prev => prev.map(s => s.id === updatedSin.id ? updatedSin : s));
+                saveSiniestroToDB(updatedSin).catch(()=>{});
+                setRelocatingSiniestroId(null);
+                setFocusPosition({ lat: latlng.lat, lng: latlng.lng });
+                return;
+            }
+            
+            const targetRisk = risks.find(r => r.id === relocatingSiniestroId);
+            if (targetRisk) {
+                const updatedRisk = { ...targetRisk, position: { lat: latlng.lat, lng: latlng.lng } };
+                setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r));
+                saveRiskToDB(updatedRisk).catch(()=>{});
+                setRelocatingSiniestroId(null);
+                setFocusPosition({ lat: latlng.lat, lng: latlng.lng });
+                return;
+            }
+            setRelocatingSiniestroId(null);
+            return;
+        }
+
         if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { 
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); 
         } else if (activeTab === 'siniestros' && allowedTabs.includes('siniestros')) {
             setNewSiniestroPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddSiniestroModalOpen(true);
         }
-    },[activeTab, currentUser]);
+    },[activeTab, currentUser, relocatingSiniestroId, siniestros, risks]);
 
     const handleSaveRisk = useCallback((id: string, riskTypeId: string, description: string, images: string[], videoUrl: string, driveUrl: string, isEditing: boolean) => {
         if (isEditing && editingRisk) {
@@ -475,6 +501,7 @@ const App: React.FC = () => {
                 selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId}
                 showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes}
                 onAddNewSiniestro={() => setIsAddSiniestroModalOpen(true)}
+                relocatingSiniestroId={relocatingSiniestroId} setRelocatingSiniestroId={setRelocatingSiniestroId}
             >
                 <MapContainer center={SAN_RAFAEL_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} className="z-0">
                     <MapFixer />

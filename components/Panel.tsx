@@ -46,7 +46,8 @@ interface PanelProps {
     showNovedadesRoutes: boolean; setShowNovedadesRoutes: (v: boolean) => void;
     selectedSiniestroId: string | null; setSelectedSiniestroId: (v: string | null) => void;
     showRiskViewerRoutes: boolean; setShowRiskViewerRoutes: (v: boolean) => void;
-    onAddNewSiniestro: () => void; // NUEVA PROP
+    onAddNewSiniestro: () => void;
+    relocatingSiniestroId: string | null; setRelocatingSiniestroId: (v: string | null) => void;
 }
 
 export const Panel: React.FC<PanelProps> = ({
@@ -56,7 +57,8 @@ export const Panel: React.FC<PanelProps> = ({
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
     telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, onUpdateSiniestro, groupColors, setGroupColors,
     novedadesFilterDate, setNovedadesFilterDate, novedadesFilterLine, setNovedadesFilterLine, showNovedadesRoutes, setShowNovedadesRoutes,
-    selectedSiniestroId, setSelectedSiniestroId, showRiskViewerRoutes, setShowRiskViewerRoutes, onAddNewSiniestro
+    selectedSiniestroId, setSelectedSiniestroId, showRiskViewerRoutes, setShowRiskViewerRoutes, onAddNewSiniestro,
+    relocatingSiniestroId, setRelocatingSiniestroId
 }) => {
 
     const renderTabContent = () => {
@@ -65,7 +67,7 @@ export const Panel: React.FC<PanelProps> = ({
             case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} />;
             case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
-            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} onUpdateSiniestro={onUpdateSiniestro} onAddNewSiniestro={onAddNewSiniestro} />;
+            case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} onUpdateSiniestro={onUpdateSiniestro} onAddNewSiniestro={onAddNewSiniestro} relocatingSiniestroId={relocatingSiniestroId} setRelocatingSiniestroId={setRelocatingSiniestroId} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
             case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
