@@ -635,7 +635,6 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 )}
-        </Panel>
     );
 };
 export default App;
