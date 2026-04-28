@@ -1,4 +1,3 @@
---- START OF FILE App.tsx ---
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, Tooltip } from 'react-leaflet';
 import L, { LatLngExpression, LatLng, Icon } from 'leaflet';
