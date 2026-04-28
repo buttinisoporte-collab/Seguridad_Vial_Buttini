@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { Siniestro, Risk, RiskType, Position, Route } from '../types';
-import { ShieldAlert, Trash2, Folder, MapPin, Edit } from 'lucide-react';
+import { ShieldAlert, Trash2, Folder, MapPin, Edit, PlusCircle } from 'lucide-react';
 
 interface SiniestrosAdminProps {
     siniestros: Siniestro[];
@@ -14,19 +14,20 @@ interface SiniestrosAdminProps {
     onFocusPosition: (pos: Position) => void;
     onUpdateRisk: (risk: Risk) => void;
     onUpdateSiniestro: (sin: Siniestro) => void;
+    onAddNewSiniestro: () => void; // NUEVO: Función para el botón rojo
 }
 
 export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({ 
-    siniestros, incidentRisks, riskTypes, routes, handleDeleteSiniestro, handleDeleteRisk, selectedSiniestroId, setSelectedSiniestroId, onFocusPosition, onUpdateRisk, onUpdateSiniestro
+    siniestros, incidentRisks, riskTypes, routes, handleDeleteSiniestro, handleDeleteRisk, selectedSiniestroId, setSelectedSiniestroId, onFocusPosition, onUpdateRisk, onUpdateSiniestro, onAddNewSiniestro
 }) => {
     
-    const[editingId, setEditingId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [editDate, setEditDate] = useState('');
     const[editRouteId, setEditRouteId] = useState('');
 
     const unifiedList = useMemo(() => {
         const safeSiniestros = Array.isArray(siniestros) ? siniestros :[];
-        const safeIncidentRisks = Array.isArray(incidentRisks) ? incidentRisks :[];
+        const safeIncidentRisks = Array.isArray(incidentRisks) ? incidentRisks : [];
         
         const list =[
             ...safeSiniestros.map(s => ({ type: 'iram', data: s as any, ts: s.timestamp })),
@@ -50,7 +51,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
     const saveManualEdit = (risk: Risk) => {
         const updatedRisk = { ...risk };
         if (editDate) updatedRisk.timestamp = new Date(editDate).getTime();
-        updatedRisk.associatedRouteIds = editRouteId ?[editRouteId] :[];
+        updatedRisk.associatedRouteIds = editRouteId ? [editRouteId] :[];
         onUpdateRisk(updatedRisk);
         setEditingId(null);
     };
@@ -68,8 +69,16 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
 
     return (
         <div className="h-full flex flex-col">
-            <h2 className="text-xl font-bold mb-2 text-red-400 flex items-center gap-2"><ShieldAlert /> Reportes de Siniestros</h2>
-            <p className="text-xs text-gray-400 mb-4">Registro unificado. Haga clic en un registro para ver los detalles y asignarlo en el mapa.</p>
+            {/* CABECERA CON EL BOTÓN AÑADIR */}
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h2 className="text-xl font-bold mb-1 text-red-400 flex items-center gap-2"><ShieldAlert /> Reportes de Siniestros</h2>
+                    <p className="text-xs text-gray-400">Haga clic en el mapa o presione el botón.</p>
+                </div>
+                <button onClick={onAddNewSiniestro} className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center gap-1 flex-shrink-0 shadow-lg transition-colors">
+                    <PlusCircle size={16} /> Añadir
+                </button>
+            </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                 {Array.isArray(unifiedList) && unifiedList.length === 0 ? (
@@ -115,7 +124,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                                                     </div>
                                                     <button onClick={() => startEdit(sin.id, sin.timestamp, sin.associatedRouteId)} className="flex items-center gap-1 text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-sky-400"><Edit size={12}/> Editar Fecha/Ruta</button>
                                                 </div>
-                                                <div><h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">Ubicación y Entorno</h4><p className="text-gray-300"><MapPin size={12} className="inline mr-1"/> {sin.ubicacion?.manual} ({sin.ubicacion?.lugar})</p><p className="text-[11px] text-gray-400 mt-1">Clima: {(Array.isArray(sin.entorno?.climas) ? sin.entorno.climas :[]).join(', ')}</p><p className="text-[11px] text-gray-400">Camino: {(Array.isArray(sin.entorno?.caminos) ? sin.entorno.caminos :[]).join(', ')}</p></div>
+                                                <div><h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">Ubicación y Entorno</h4><p className="text-gray-300"><MapPin size={12} className="inline mr-1"/> {sin.ubicacion?.manual} ({sin.ubicacion?.lugar})</p><p className="text-[11px] text-gray-400 mt-1">Clima: {(Array.isArray(sin.entorno?.climas) ? sin.entorno.climas : []).join(', ')}</p><p className="text-[11px] text-gray-400">Camino: {(Array.isArray(sin.entorno?.caminos) ? sin.entorno.caminos :[]).join(', ')}</p></div>
                                                 <div><h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">Detalles</h4><p className="text-gray-300 mb-1"><b>Gravedad:</b> {sin.descripcion?.gravedad}</p><p className="text-gray-300 italic bg-gray-800 p-2 rounded mb-2">"{sin.descripcion?.resumen}"</p><p className="text-xs text-gray-400"><b>Factores:</b> {sin.descripcion?.factoresCausales}</p>
                                                     <div className="mt-2"><p className="text-xs font-bold text-gray-300">Consecuencias:</p><ul className="list-disc list-inside text-[11px] text-gray-400">{(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias :[]).filter(c => c.activa).map(c => (<li key={c.tipo}>{c.tipo} {c.cantidad ? `(${c.cantidad})` : ''}</li>))}</ul></div>
                                                 </div>
@@ -123,7 +132,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                                                 {(Array.isArray(sin.images) && sin.images.length > 0) && (<div><h4 className="text-sky-400 font-bold mb-2 border-b border-gray-700 pb-1">Fotografías ({sin.images.length})</h4><div className="grid grid-cols-3 gap-2">{sin.images.map((img, idx) => (<a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Siniestro" className="w-full h-16 object-cover rounded border border-gray-600 hover:border-sky-500" /></a>))}</div></div>)}
                                                 {sin.driveUrl && (<div className="pt-2"><a href={sin.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-xs"><Folder size={16}/> Carpeta Externa Drive</a></div>)}
                                             </div>
-                                        ) 
+                                        )
                                     )}
                                 </div>
                             );
@@ -180,7 +189,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                                                     <div className="pt-2"><a href={risk.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-xs"><Folder size={16}/> Carpeta Externa Drive</a></div>
                                                 )}
                                             </div>
-                                        )
+                                        ) 
                                     )}
                                 </div>
                             );
