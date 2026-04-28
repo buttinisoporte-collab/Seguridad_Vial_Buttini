@@ -8,6 +8,7 @@ interface SiniestroFormProps {
     onSaveSiniestro: (sin: Siniestro) => Promise<void>; 
     initialPosition?: { lat: number; lng: number; }; 
     onCancel?: () => void; 
+    onRequestMapSelect?: () => void;
     isModal?: boolean; // NUEVO: Identifica si está abierto desde el panel de control
 }
 
@@ -21,7 +22,7 @@ const CONSECUENCIAS_DEFAULT: Consecuencia[] =[
     { tipo: 'Lesionados No Transportados', activa: false, cantidad: '' }
 ];
 
-export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, onCancel, isModal }) => {
+export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, onCancel, onRequestMapSelect, isModal }) => {
     const[step, setStep] = useState(1);
     const[isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
@@ -133,15 +134,27 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase">Fecha y Hora</span><input type="datetime-local" name="fechaHora" value={f.fechaHora} onChange={handleChange} required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none" /></label>
                         
                         {/* LÓGICA DE MAPA O GPS SEGÚN MODO */}
-                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-900/50 p-2 rounded">
-                            <MapPin size={14}/> 
-                            {gpsPosition ? (
-                                <span className="text-green-400 font-bold">Ubicación Capturada</span>
-                            ) : isModal ? (
-                                <button type="button" onClick={() => { if(onCancel) onCancel(); alert("Haga clic directamente en el mapa para establecer la ubicación del siniestro."); }} className="bg-sky-600 text-white px-2 py-1 rounded font-bold hover:bg-sky-500 transition-colors">📍 Seleccionar punto en mapa</button>
-                            ) : (
-                                <span className="animate-pulse">Buscando GPS...</span>
-                            )}
+                        <div className="flex flex-col gap-2 text-xs text-gray-400 bg-gray-900/50 p-2 rounded">
+                            <div className="flex items-center gap-2">
+                                <MapPin size={14}/> 
+                                {gpsPosition ? (
+                                    <span className="text-green-400 font-bold">Ubicación Capturada</span>
+                                ) : isModal ? (
+                                    <span className="text-orange-400 font-bold">Falta ubicación precisa</span>
+                                ) : (
+                                    <span className="animate-pulse">Buscando GPS...</span>
+                                )}
+                            </div>
+                            {isModal ? (
+                                <button type="button" onClick={() => { 
+                                    if(onRequestMapSelect) {
+                                        onRequestMapSelect();
+                                    } else if(onCancel) {
+                                        onCancel(); 
+                                        alert("Haga clic directamente en el mapa para establecer la ubicación."); 
+                                    }
+                                }} className="w-full bg-sky-600 text-white px-2 py-2 rounded font-bold hover:bg-sky-500 transition-colors">📍 Seleccionar punto en mapa</button>
+                            ) : null}
                         </div>
 
                         <input type="text" name="ubicacionManual" value={f.ubicacionManual} onChange={handleChange} placeholder="Calle/Intersección/KM..." required={!gpsPosition} className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm" />

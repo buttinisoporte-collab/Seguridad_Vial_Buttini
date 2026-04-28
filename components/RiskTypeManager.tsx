@@ -7,9 +7,11 @@ interface RiskTypeManagerProps {
     riskTypes: RiskType[];
     setRiskTypes: React.Dispatch<React.SetStateAction<RiskType[]>>;
     isAdmin: boolean;
+    showRoutes: boolean;
+    setShowRoutes: (v: boolean) => void;
 }
 
-export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, setRiskTypes, isAdmin }) => {
+export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, setRiskTypes, isAdmin, showRoutes, setShowRoutes }) => {
     const[newTypeName, setNewTypeName] = useState('');
     const[newTypeColor, setNewTypeColor] = useState('#ffffff');
     const[editingType, setEditingType] = useState<RiskType | null>(null);
@@ -45,6 +47,14 @@ export const RiskTypeManager: React.FC<RiskTypeManagerProps> = ({ riskTypes, set
     return (
         <div>
             <h2 className="text-xl font-bold mb-4 text-sky-300">Categorías de Puntos</h2>
+            <div className="flex items-center justify-between mb-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
+                <span className="text-sm font-semibold text-gray-300">Mostrar traza de servicios</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={showRoutes} onChange={(e) => setShowRoutes(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                </label>
+            </div>
+
             <div className="bg-gray-700 p-4 rounded-lg mb-4">
                 <h3 className="font-semibold text-white mb-3">{editingType ? 'Editar Categoría' : 'Agregar Nueva Categoría'}</h3>
                 <div className="flex flex-col space-y-3">

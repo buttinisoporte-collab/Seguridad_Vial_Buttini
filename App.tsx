@@ -105,6 +105,7 @@ const App: React.FC = () => {
     const[novedadesFilterDate, setNovedadesFilterDate] = useState('');
     const[novedadesFilterLine, setNovedadesFilterLine] = useState('');
     const[showNovedadesRoutes, setShowNovedadesRoutes] = useState(true);
+    const[showRiskTypesRoutes, setShowRiskTypesRoutes] = useState(true);
     const[selectedSiniestroId, setSelectedSiniestroId] = useState<string | null>(null);
 
     useEffect(() => { localStorage.setItem('tg_token', telegramToken); },[telegramToken]);
@@ -116,6 +117,7 @@ const App: React.FC = () => {
     const[newRiskPosition, setNewRiskPosition] = useState<Position | null>(null);
 
     const[isAddSiniestroModalOpen, setIsAddSiniestroModalOpen] = useState<boolean>(false);
+    const[isHidingSiniestroModalForMap, setIsHidingSiniestroModalForMap] = useState<boolean>(false);
     const[newSiniestroPosition, setNewSiniestroPosition] = useState<Position | null>(null);
 
     const prevRoutesRef = useRef<Route[]>([]);
@@ -307,7 +309,7 @@ const App: React.FC = () => {
     const togglePublicRoute = useCallback((id: string) => setRoutes(prev => prev.map(r => r.id === id ? { ...r, isPublic: !r.isPublic } : r)),[]);
     
     const handleMapClick = useCallback((latlng: LatLng) => { 
-        const allowedTabs = Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]; 
+        const hasTabAccess = (tab: AppTab) => currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser!.allowedTabs.includes(tab));
 
         if (relocatingSiniestroId) {
             const targetSin = siniestros.find(s => s.id === relocatingSiniestroId);
@@ -333,10 +335,12 @@ const App: React.FC = () => {
             return;
         }
 
-        if (activeTab === 'riskTypes' && allowedTabs.includes('riskTypes')) { 
+        if (activeTab === 'riskTypes' && hasTabAccess('riskTypes')) { 
             setNewRiskPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddRiskModalOpen(true); 
-        } else if (activeTab === 'siniestros' && allowedTabs.includes('siniestros')) {
-            setNewSiniestroPosition({ lat: latlng.lat, lng: latlng.lng }); setIsAddSiniestroModalOpen(true);
+        } else if (activeTab === 'siniestros' && hasTabAccess('siniestros')) {
+            setNewSiniestroPosition({ lat: latlng.lat, lng: latlng.lng }); 
+            setIsAddSiniestroModalOpen(true);
+            setIsHidingSiniestroModalForMap(false);
         }
     },[activeTab, currentUser, relocatingSiniestroId, siniestros, risks]);
 
@@ -351,7 +355,8 @@ const App: React.FC = () => {
     },[editingRisk, newRiskPosition, findAssociatedRouteIds]);
 
     const handleDeleteRisk = useCallback((id: string) => { 
-        if (!currentUser?.isAdmin) return alert("No tienes permisos para eliminar.");
+        const canDelete = currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser!.allowedTabs.includes('riskTypes'));
+        if (!canDelete) return alert("No tienes permisos para eliminar.");
         if (window.confirm("¿Está seguro que desea eliminar este reporte?")) setRisks(prev => prev.filter(r => r.id !== id)); 
     },[currentUser]);
    
@@ -423,6 +428,9 @@ const App: React.FC = () => {
             const affectedRouteIds = new Set<string>();
             baseVisibleRisks.forEach(risk => { (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).forEach(id => affectedRouteIds.add(id)); });
             return routes.filter(route => affectedRouteIds.has(route.id));
+        }
+        else if (activeTab === 'riskTypes') {
+            return showRiskTypesRoutes ? routes : [];
         }
         else if (activeTab === 'siniestros') {
             if (!selectedSiniestroId) return[];
@@ -498,6 +506,7 @@ const App: React.FC = () => {
                 novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate}
                 novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine}
                 showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
+                showRiskTypesRoutes={showRiskTypesRoutes} setShowRiskTypesRoutes={setShowRiskTypesRoutes}
                 selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId}
                 showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes}
                 onAddNewSiniestro={() => setIsAddSiniestroModalOpen(true)}
@@ -508,7 +517,7 @@ const App: React.FC = () => {
                     <MapFocusUpdater focusPosition={focusPosition} />
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
                     <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} />
-                    {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes(activeTab) && <MapClickHandler onMapClick={handleMapClick} />}
+                    {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}
 
                     {Array.isArray(visibleRoutes) && visibleRoutes.map(route => {
                         const path: LatLngExpression[][] =[];
@@ -547,7 +556,7 @@ const App: React.FC = () => {
                                         {activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && (
                                             <div className="flex gap-1 ml-2">
                                                 {!risk.driverReportDetails && <button onClick={() => setEditingRisk(risk)} className="p-1 text-gray-400 hover:text-sky-500"><Edit2 size={14} /></button>}
-                                                {currentUser?.isAdmin && <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>}
+                                                <button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                                             </div>
                                         )}
                                     </div>
@@ -617,15 +626,28 @@ const App: React.FC = () => {
 
                     {newRiskPosition && activeTab === 'riskTypes' && (Array.isArray(currentUser?.allowedTabs) ? currentUser!.allowedTabs :[]).includes('riskTypes') && <Circle center={[newRiskPosition.lat, newRiskPosition.lng]} radius={proximityDistance} color="#fb923c" fillOpacity={0.2} />}
                 </MapContainer>
+
+                {(isAddRiskModalOpen || editingRisk) && (
+                    <RiskModal 
+                        riskTypes={riskTypes} 
+                        onClose={() => { setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null); }} 
+                        onSave={(typeId, desc, imgs, vid, drive) => {
+                            const id = editingRisk ? editingRisk.id : uuidv4();
+                            handleSaveRisk(id, typeId, desc, imgs, vid, drive, !!editingRisk);
+                        }}
+                        editingRisk={editingRisk || undefined}
+                    />
+                )}
                 
                 {/* MODAL DE SINIESTROS MANUALES */}
                 {isAddSiniestroModalOpen && (
-                    <div className="fixed inset-0 bg-black/80 z-[9999] flex items-start justify-center overflow-y-auto p-4 sm:p-6">
+                    <div className={`fixed inset-0 bg-black/80 z-[9999] flex items-start justify-center overflow-y-auto p-4 sm:p-6 ${isHidingSiniestroModalForMap ? 'hidden' : ''}`}>
                         <div className="relative w-full max-w-lg my-4 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700">
                             <SiniestroForm 
                                 isModal={true}
                                 initialPosition={newSiniestroPosition || undefined}
-                                onCancel={() => { setIsAddSiniestroModalOpen(false); setNewSiniestroPosition(null); }}
+                                onCancel={() => { setIsAddSiniestroModalOpen(false); setNewSiniestroPosition(null); setIsHidingSiniestroModalForMap(false); }}
+                                onRequestMapSelect={() => setIsHidingSiniestroModalForMap(true)}
                                 onSaveSiniestro={async (sin) => {
                                     setSiniestros(prev =>[...prev, sin]);
                                     await saveSiniestroToDB(sin);

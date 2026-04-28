@@ -44,6 +44,7 @@ interface PanelProps {
     novedadesFilterDate: string; setNovedadesFilterDate: (v: string) => void;
     novedadesFilterLine: string; setNovedadesFilterLine: (v: string) => void;
     showNovedadesRoutes: boolean; setShowNovedadesRoutes: (v: boolean) => void;
+    showRiskTypesRoutes: boolean; setShowRiskTypesRoutes: (v: boolean) => void;
     selectedSiniestroId: string | null; setSelectedSiniestroId: (v: string | null) => void;
     showRiskViewerRoutes: boolean; setShowRiskViewerRoutes: (v: boolean) => void;
     onAddNewSiniestro: () => void;
@@ -57,6 +58,7 @@ export const Panel: React.FC<PanelProps> = ({
     riskViewerSelectedTypes, setRiskViewerSelectedTypes, togglePublicRoute, handleDeleteRisk, setFocusPosition, showAllRoutes, setShowAllRoutes,
     telegramToken, setTelegramToken, telegramChatId, setTelegramChatId, onUpdateRisk, onUpdateSiniestro, groupColors, setGroupColors,
     novedadesFilterDate, setNovedadesFilterDate, novedadesFilterLine, setNovedadesFilterLine, showNovedadesRoutes, setShowNovedadesRoutes,
+    showRiskTypesRoutes, setShowRiskTypesRoutes,
     selectedSiniestroId, setSelectedSiniestroId, showRiskViewerRoutes, setShowRiskViewerRoutes, onAddNewSiniestro,
     relocatingSiniestroId, setRelocatingSiniestroId
 }) => {
@@ -64,7 +66,7 @@ export const Panel: React.FC<PanelProps> = ({
     const renderTabContent = () => {
         switch (activeTab) {
             case 'routes': return <RouteManager routes={routes} onAddRoute={onAddRoute} setRoutes={setRoutes} showRisks={showRisks} setShowRisks={setShowRisks} showIncidents={showIncidents} setShowIncidents={setShowIncidents} filterGroup={filterGroup} setFilterGroup={setFilterGroup} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} activeRouteId={activeRouteId} setActiveRouteId={setActiveRouteId} togglePublicRoute={togglePublicRoute} isAdmin={currentUser.isAdmin} showAllRoutes={showAllRoutes} setShowAllRoutes={setShowAllRoutes} />;
-            case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} />;
+            case 'riskTypes': return <RiskTypeManager riskTypes={riskTypes} setRiskTypes={setRiskTypes} isAdmin={currentUser.isAdmin} showRoutes={showRiskTypesRoutes} setShowRoutes={setShowRiskTypesRoutes} />;
             case 'riskViewer': return <RiskViewer riskTypes={riskTypes} risks={risks} routes={routes} selectedTypes={riskViewerSelectedTypes} setSelectedTypes={setRiskViewerSelectedTypes} showRiskViewerRoutes={showRiskViewerRoutes} setShowRiskViewerRoutes={setShowRiskViewerRoutes} filterLine={filterLine} setFilterLine={setFilterLine} filterService={filterService} setFilterService={setFilterService} />;
             case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
             case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} onUpdateSiniestro={onUpdateSiniestro} onAddNewSiniestro={onAddNewSiniestro} relocatingSiniestroId={relocatingSiniestroId} setRelocatingSiniestroId={setRelocatingSiniestroId} />;
