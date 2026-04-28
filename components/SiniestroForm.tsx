@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { ShieldAlert, MapPin, Camera, CheckCircle, ExternalLink, Trash2, Image as ImageIcon, X } from 'lucide-react';
+import { ShieldAlert, MapPin, Camera, CheckCircle, Trash2, Image as ImageIcon, X } from 'lucide-react';
 import type { Siniestro, Consecuencia } from '../types';
 import { uploadSiniestroImage } from '../lib/firebase';
 
 interface SiniestroFormProps { 
     onSaveSiniestro: (sin: Siniestro) => Promise<void>; 
-    initialPosition?: { lat: number; lng: number; }; // Para carga en mapa
-    initialData?: Siniestro; // Para modo edición
-    onCancel?: () => void; // Para cerrar modal
+    initialPosition?: { lat: number; lng: number; }; 
+    onCancel?: () => void; 
+    isModal?: boolean; // NUEVO: Identifica si está abierto desde el panel de control
 }
 
 const CLIMAS =['Niebla', 'Resplandor Solar', 'Lluvia', 'Nieve', 'Granizo', 'Calor extremo', 'Viento Zonda', 'Polvo en suspensión'];
@@ -21,50 +21,35 @@ const CONSECUENCIAS_DEFAULT: Consecuencia[] =[
     { tipo: 'Lesionados No Transportados', activa: false, cantidad: '' }
 ];
 
-export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, initialData, onCancel }) => {
+export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, onCancel, isModal }) => {
     const[step, setStep] = useState(1);
     const[isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
-    const[gpsPosition, setGpsPosition] = useState<{lat: number, lng: number}|null>(initialData?.ubicacion?.lat ? { lat: initialData.ubicacion.lat, lng: initialData.ubicacion.lng! } : null);
+    const[gpsPosition, setGpsPosition] = useState<{lat: number, lng: number}|null>(null);
     const[selectedFiles, setSelectedFiles] = useState<File[]>([]);
-    const[existingImages, setExistingImages] = useState<string[]>(initialData?.images || []);
 
     const[f, setF] = useState({
-        fechaHora: initialData?.fechaHora ? new Date(initialData.fechaHora).toISOString().slice(0, 16) : new Date().toISOString().slice(0,16), 
-        ubicacionManual: initialData?.ubicacion?.manual || '', 
-        lugar: initialData?.ubicacion?.lugar || 'Ciudad',
-        climas: initialData?.entorno?.climas || ([] as string[]), 
-        caminos: initialData?.entorno?.caminos || ([] as string[]),
-        condNombre: initialData?.conductor?.nombre || '', 
-        condLegajo: initialData?.conductor?.legajo || '', 
-        condInterno: initialData?.conductor?.interno || '', 
-        condKm: initialData?.conductor?.kilometraje || '', 
-        condLinea: initialData?.conductor?.linea || '',
-        descTipo: initialData?.descripcion?.tipo || 'Choque entre vehículos-Moto-Bicicletas', 
-        descResumen: initialData?.descripcion?.resumen || '', 
-        consecuencias: initialData?.descripcion?.consecuencias?.length ? initialData.descripcion.consecuencias : JSON.parse(JSON.stringify(CONSECUENCIAS_DEFAULT)) as Consecuencia[], 
-        descFactores: initialData?.descripcion?.factoresCausales || 'Factor Humano (error, descripción, velocidad)',
-        tercNombre: initialData?.datosComplementarios?.nombreTercero || '', 
-        tercDNI: initialData?.datosComplementarios?.dniTercero || '', 
-        tercVehiculo: initialData?.datosComplementarios?.vehiculoTercero || '', 
-        tercPatente: initialData?.datosComplementarios?.patenteTercero || '', 
-        tercSeguro: initialData?.datosComplementarios?.seguroTercero || '', 
-        tercPoliza: initialData?.datosComplementarios?.polizaTercero || '',
-        intervencionPolicial: initialData?.datosComplementarios?.intervencionPolicial || false, 
-        hayTestigos: initialData?.datosComplementarios?.hayTestigos || false, 
-        testigosInfo: initialData?.datosComplementarios?.testigosInfo || '', 
-        driveUrl: initialData?.driveUrl || '',
-        tercInvolucrado: !!initialData?.datosComplementarios?.nombreTercero || !!initialData?.datosComplementarios?.vehiculoTercero || false
+        fechaHora: new Date().toISOString().slice(0,16), ubicacionManual: '', lugar: 'Ciudad',
+        climas: [] as string[], caminos:[] as string[],
+        condNombre: '', condLegajo: '', condInterno: '', condKm: '', condLinea: '',
+        descTipo: 'Choque entre vehículos-Moto-Bicicletas', descResumen: '', 
+        consecuencias: JSON.parse(JSON.stringify(CONSECUENCIAS_DEFAULT)) as Consecuencia[], 
+        descFactores: 'Factor Humano (error, descripción, velocidad)',
+        tercNombre: '', tercDNI: '', tercVehiculo: '', tercPatente: '', tercSeguro: '', tercPoliza: '',
+        intervencionPolicial: false, hayTestigos: false, testigosInfo: '', driveUrl: ''
     });
 
     useEffect(() => {
-        if (!initialData && !initialPosition) {
+        if (initialPosition) {
+            setGpsPosition(initialPosition);
+        } else if (!isModal) {
+            // Solo busca GPS si NO es modal (es decir, si es el conductor en la calle)
             navigator.geolocation.getCurrentPosition(
                 pos => setGpsPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
                 () => console.warn("GPS no disponible"), { enableHighAccuracy: true }
             );
         }
-    },[initialPosition]);
+    },[initialPosition, isModal]);
 
     const handleChange = (e: any) => setF({ ...f, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
@@ -76,17 +61,18 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
     const handleConsecuenciaChange = (index: number, field: 'activa' | 'cantidad', value: any) => {
         const newCons =[...f.consecuencias];
-        newCons[index] = { ...newCons[index], [field]: value };
+        newCons[index] = { ...newCons[index],[field]: value };
         setF({ ...f, consecuencias: newCons });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (selectedFiles.length === 0 && existingImages.length === 0) return alert("Debe adjuntar al menos una fotografía del hecho.");
+        if (selectedFiles.length === 0) return alert("Debe adjuntar al menos una fotografía del hecho.");
+        if (isModal && !gpsPosition && !f.ubicacionManual) return alert("Debe seleccionar una ubicación en el mapa o ingresarla manualmente.");
         
         setIsSubmitting(true);
-        const siniestroId = initialData?.id || uuidv4();
-        const uploadedImageUrls: string[] = [...existingImages];
+        const siniestroId = uuidv4();
+        const uploadedImageUrls: string[] =[];
 
         try {
             for (let i = 0; i < selectedFiles.length; i++) {
@@ -95,13 +81,8 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 uploadedImageUrls.push(url);
             }
 
-            let computedTimestamp = initialData?.timestamp || Date.now();
-            if (initialData?.fechaHora !== f.fechaHora) {
-                computedTimestamp = new Date(f.fechaHora).getTime();
-            }
-
             const newSiniestro: Siniestro = {
-                id: siniestroId, timestamp: computedTimestamp, fechaHora: f.fechaHora,
+                id: siniestroId, timestamp: Date.now(), fechaHora: f.fechaHora,
                 ubicacion: { lat: gpsPosition?.lat, lng: gpsPosition?.lng, manual: f.ubicacionManual, lugar: f.lugar },
                 conductor: { nombre: f.condNombre, legajo: f.condLegajo, interno: f.condInterno, kilometraje: f.condKm, linea: f.condLinea },
                 descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores },
@@ -110,12 +91,12 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                     nombreTercero: f.tercNombre, dniTercero: f.tercDNI, vehiculoTercero: f.tercVehiculo, patenteTercero: f.tercPatente, seguroTercero: f.tercSeguro, polizaTercero: f.tercPoliza,
                     intervencionPolicial: f.intervencionPolicial, hayTestigos: f.hayTestigos, testigosInfo: f.testigosInfo
                 },
-                images: uploadedImageUrls, driveUrl: f.driveUrl, associatedRouteId: initialData?.associatedRouteId
+                images: uploadedImageUrls, driveUrl: f.driveUrl
             };
 
             await onSaveSiniestro(newSiniestro);
             setStep(2);
-        } catch (error) { alert("Error al subir las imágenes. Verifique que no pesen demasiado."); }
+        } catch (error) { alert("Error al subir las imágenes. Verifique su conexión."); }
         setIsSubmitting(false);
     };
 
@@ -150,8 +131,20 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">1. Información General</h2>
                     <div className="space-y-3">
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase">Fecha y Hora</span><input type="datetime-local" name="fechaHora" value={f.fechaHora} onChange={handleChange} required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none" /></label>
-                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-900/50 p-2 rounded"><MapPin size={14}/> {gpsPosition ? <span className="text-green-400 font-bold">Ubicación Capturada</span> : <span className="animate-pulse">Buscando...</span>}</div>
-                        <input type="text" name="ubicacionManual" value={f.ubicacionManual} onChange={handleChange} placeholder="Calle/Intersección/KM..." required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm" />
+                        
+                        {/* LÓGICA DE MAPA O GPS SEGÚN MODO */}
+                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-900/50 p-2 rounded">
+                            <MapPin size={14}/> 
+                            {gpsPosition ? (
+                                <span className="text-green-400 font-bold">Ubicación Capturada</span>
+                            ) : isModal ? (
+                                <button type="button" onClick={() => { if(onCancel) onCancel(); alert("Haga clic directamente en el mapa para establecer la ubicación del siniestro."); }} className="bg-sky-600 text-white px-2 py-1 rounded font-bold hover:bg-sky-500 transition-colors">📍 Seleccionar punto en mapa</button>
+                            ) : (
+                                <span className="animate-pulse">Buscando GPS...</span>
+                            )}
+                        </div>
+
+                        <input type="text" name="ubicacionManual" value={f.ubicacionManual} onChange={handleChange} placeholder="Calle/Intersección/KM..." required={!gpsPosition} className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm" />
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase font-bold">ZONA:</span>
                             <select name="lugar" value={f.lugar} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm"><option value="Ciudad">Ciudad</option><option value="Rural">Rural</option><option value="Terminal">Terminal</option><option value="Base">Base</option></select>
                         </label>
@@ -226,18 +219,11 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                     </select>
                 </div>
 
-                {/* SECCION 4 */}
-                <div className="bg-blue-900/30 p-4 rounded-xl border border-blue-500/50 shadow-md">
-                    <h2 className="font-bold text-blue-400 mb-3 border-b border-blue-500/30 pb-1 uppercase text-xs tracking-wider">4. Deslinde de Atención Médica</h2>
-                    <p className="text-[11px] text-blue-200/70 mb-4">Si el pasajero o tercero manifiesta no requerir atención médica inmediata, debe completar el formulario.</p>
-                    <a href="https://deslinde-responsabilidad.vercel.app/" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg">Acceder al Formulario <ExternalLink size={18} /></a>
-                </div>
-
-                {/* SECCION 5 */}
+                {/* SECCION 4 (Antes Datos Complementarios) */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <div className="flex justify-between items-center mb-3 border-b border-gray-700 pb-1">
-                        <h2 className="font-bold text-sky-400 uppercase text-xs tracking-wider">5. Datos Complementarios</h2>
-                        <input type="checkbox" name="tercInvolucrado" checked={f.tercInvolucrado} onChange={handleChange} className="w-6 h-6 rounded bg-gray-900 border-gray-600 text-sky-500 focus:ring-0" />
+                        <h2 className="font-bold text-sky-400 uppercase text-xs tracking-wider">4. Datos Complementarios</h2>
+                        <input type="checkbox" name="tercInvolucrado" checked={f.tercInvolucrado} onChange={handleChange} className="w-6 h-6 rounded bg-gray-900 border-gray-600 text-sky-500 focus:ring-0" title="Terceros Involucrados" />
                     </div>
                     {f.tercInvolucrado && (
                         <div className="space-y-3 animate-in fade-in duration-300">
@@ -266,24 +252,14 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                     )}
                 </div>
 
-                {/* SECCION 6 */}
+                {/* SECCION 5 (Antes Fotografias) */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md pb-8">
-                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">6. Fotografías del Hecho</h2>
+                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">5. Fotografías del Hecho</h2>
                     <p className="text-[11px] text-gray-400 mb-4 italic">Suba fotos de: daños propios, daños terceros, posición de vehículos (TOME FOTOS PANORÁMICAS) y documentos (TOME FOTOS ENFOCADAS Y CLARAS).</p>
                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors bg-gray-900/50">
                         <div className="flex flex-col items-center justify-center pt-5 pb-6"><Camera size={32} className="text-sky-500 mb-2" /><p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p></div>
                         <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileSelect} />
                     </label>
-                    {existingImages.length > 0 && (
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            {existingImages.map((img, index) => (
-                                <div key={index} className="relative bg-gray-900 rounded border border-gray-700 flex flex-col items-center justify-between overflow-hidden group">
-                                    <img src={img} alt="Siniestro" className="w-full h-16 object-cover opacity-80" />
-                                    <button type="button" onClick={() => setExistingImages(prev => prev.filter((_, i) => i !== index))} className="absolute top-1 right-1 text-red-500 bg-gray-900/80 rounded-full p-1 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                     {selectedFiles.length > 0 && (
                         <div className="mt-4 grid grid-cols-2 gap-2">
                             {selectedFiles.map((file, index) => (
