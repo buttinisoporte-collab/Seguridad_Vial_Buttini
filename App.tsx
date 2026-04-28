@@ -346,7 +346,7 @@ const App: React.FC = () => {
 
             } catch (error) {
                 console.error(error);
-                alert("Error al procesar el archivo KML. Verifique que sea un formato válido.");
+                alert("Error al procesar el KML. Verifique que sea un formato válido.");
             }
         };
         reader.readAsText(kmlFile);
