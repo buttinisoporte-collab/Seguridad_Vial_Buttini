@@ -28,17 +28,33 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
     const [editDate, setEditDate] = useState('');
     const [editRouteId, setEditRouteId] = useState('');
     const [editGravedad, setEditGravedad] = useState('');
+    
+    const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+    const [filterMonth, setFilterMonth] = useState((new Date().getMonth() + 1).toString());
+
+    // Generate years from 2020 to current
+    const years = Array.from({ length: new Date().getFullYear() - 2020 + 2 }, (_, i) => (2020 + i).toString());
 
     const unifiedList = useMemo(() => {
         const safeSiniestros = Array.isArray(siniestros) ? siniestros :[];
         const safeIncidentRisks = Array.isArray(incidentRisks) ? incidentRisks :[];
         
-        const list =[
+        let list =[
             ...safeSiniestros.map(s => ({ type: 'iram', data: s as any, ts: s.timestamp })),
             ...safeIncidentRisks.map(r => ({ type: 'manual', data: r as any, ts: r.timestamp || 0 }))
         ];
+        
+        if (filterYear) {
+            list = list.filter(item => {
+                const itemDate = new Date(item.ts);
+                const yearMatch = itemDate.getFullYear().toString() === filterYear;
+                if (!filterMonth) return yearMatch;
+                return yearMatch && (itemDate.getMonth() + 1).toString() === filterMonth;
+            });
+        }
+        
         return list.sort((a, b) => b.ts - a.ts);
-    },[siniestros, incidentRisks]);
+    },[siniestros, incidentRisks, filterYear, filterMonth]);
 
     const startEditIram = (sin: Siniestro) => {
         setEditingId(sin.id);
@@ -89,9 +105,20 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                     <h2 className="text-xl font-bold mb-1 text-red-400 flex items-center gap-2"><ShieldAlert /> Reportes de Siniestros</h2>
                     <p className="text-xs text-gray-400">Haga clic en un registro para editarlo o ubicarlo.</p>
                 </div>
-                <button onClick={onAddNewSiniestro} className="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 shadow hover:shadow-lg transition-all text-sm font-bold">
+                <button onClick={onAddNewSiniestro} className="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 shadow hover:shadow-lg transition-all text-sm font-bold shrink-0">
                     <Plus size={16} /> Cargar Siniestro
                 </button>
+            </div>
+            
+            <div className="flex gap-2 mb-4">
+                <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none">
+                    <option value="">Todos los años</option>
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} disabled={!filterYear} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none disabled:opacity-50">
+                    <option value="">Todos los meses</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m.toString()}>{m.toString().padStart(2, '0')}</option>)}
+                </select>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">

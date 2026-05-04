@@ -68,7 +68,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (selectedFiles.length === 0) return alert("Debe adjuntar al menos una fotografía del hecho.");
+        if (!isModal && selectedFiles.length === 0) return alert("Debe adjuntar al menos una fotografía del hecho.");
         if (isModal && !gpsPosition && !f.ubicacionManual) return alert("Debe seleccionar una ubicación en el mapa o ingresarla manualmente.");
         
         setIsSubmitting(true);
@@ -218,6 +218,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                         <option value="Choque con objeto físico">Choque con objeto físico</option>
                         <option value="Impacto a peatón">Impacto a peatón</option>
                         <option value="Caída de pasajero abordo">Caída de pasajero abordo</option>
+                        <option value="Rotura de Cristales">Rotura de Cristales</option>
                     </select>
                     <textarea name="descResumen" value={f.descResumen} onChange={handleChange} placeholder="Relato de lo ocurrido..." required rows={3} className="w-full bg-gray-900 border border-gray-600 rounded p-3 mb-4 text-sm"></textarea>
                     
@@ -240,6 +241,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                         <option value="Factor vehículo (falla mecánica)">Factor vehículo (falla mecánica)</option>
                         <option value="Factor vía (estado ruta, señalización)">Factor vía (estado ruta, señalización)</option>
                         <option value="Factor externo (terceros, clima)">Factor externo (terceros, clima)</option>
+                        <option value="Vandalismo">Vandalismo</option>
                     </select>
                 </div>
 

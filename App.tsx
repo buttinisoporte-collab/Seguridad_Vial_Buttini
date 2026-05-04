@@ -603,7 +603,7 @@ const App: React.FC = () => {
                         const icon = createRiskIcon('#ef4444'); 
                         return (
                             <Marker key={`iram-${sin.id}`} position={[sin.ubicacion.lat, sin.ubicacion.lng]} icon={icon}>
-                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro IRAM</Tooltip>
+                                <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro</Tooltip>
                                 <Popup>
                                     <div className="min-w-[250px]">
                                         <div className="font-bold text-lg leading-tight text-red-600">Reporte Siniestro IRAM</div>
