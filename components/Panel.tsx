@@ -49,6 +49,7 @@ interface PanelProps {
     showRiskViewerRoutes: boolean; setShowRiskViewerRoutes: (v: boolean) => void;
     onAddNewSiniestro: () => void;
     relocatingSiniestroId: string | null; setRelocatingSiniestroId: (v: string | null) => void;
+    companyLogo: string; setCompanyLogo: (v: string) => void;
 }
 
 export const Panel: React.FC<PanelProps> = ({
@@ -60,7 +61,7 @@ export const Panel: React.FC<PanelProps> = ({
     novedadesFilterDate, setNovedadesFilterDate, novedadesFilterLine, setNovedadesFilterLine, showNovedadesRoutes, setShowNovedadesRoutes,
     showRiskTypesRoutes, setShowRiskTypesRoutes,
     selectedSiniestroId, setSelectedSiniestroId, showRiskViewerRoutes, setShowRiskViewerRoutes, onAddNewSiniestro,
-    relocatingSiniestroId, setRelocatingSiniestroId
+    relocatingSiniestroId, setRelocatingSiniestroId, companyLogo, setCompanyLogo
 }) => {
 
     const renderTabContent = () => {
@@ -71,7 +72,7 @@ export const Panel: React.FC<PanelProps> = ({
             case 'novedades': return <NovedadesList risks={risks} routes={routes} currentUser={currentUser} handleDeleteRisk={handleDeleteRisk} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate} novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine} showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes} />;
             case 'siniestros': return <SiniestrosAdmin siniestros={siniestros} incidentRisks={incidentRisks} riskTypes={riskTypes} routes={routes} handleDeleteSiniestro={handleDeleteSiniestro} handleDeleteRisk={handleDeleteRisk} selectedSiniestroId={selectedSiniestroId} setSelectedSiniestroId={setSelectedSiniestroId} onFocusPosition={setFocusPosition} onUpdateRisk={onUpdateRisk} onUpdateSiniestro={onUpdateSiniestro} onAddNewSiniestro={onAddNewSiniestro} relocatingSiniestroId={relocatingSiniestroId} setRelocatingSiniestroId={setRelocatingSiniestroId} />;
             case 'reports': return <ReportViewer routes={routes} risks={risks} getRiskType={getRiskType} selectedRouteId={reportSelectedRouteId} setSelectedRouteId={setReportSelectedRouteId} />;
-            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} />;
+            case 'settings': return <Settings proximityDistance={proximityDistance} setProximityDistance={setProximityDistance} driverReportTTL={driverReportTTL} setDriverReportTTL={setDriverReportTTL} telegramToken={telegramToken} setTelegramToken={setTelegramToken} telegramChatId={telegramChatId} setTelegramChatId={setTelegramChatId} routes={routes} groupColors={groupColors} setGroupColors={setGroupColors} companyLogo={companyLogo} setCompanyLogo={setCompanyLogo} risks={risks} setRisks={setRisks} riskTypes={riskTypes}  />;
             case 'users': return <UserManager users={users} setUsers={setUsers} currentUser={currentUser} />;
             default: return null;
         }
@@ -111,10 +112,10 @@ export const Panel: React.FC<PanelProps> = ({
             <header className="h-[72px] bg-[#0b0f19] text-white flex items-center justify-between shadow-md z-20 flex-shrink-0">
                 <div className="flex items-center h-full pl-3 pr-6 bg-white/5 border-r border-white/10">
                     <img 
-                        src={LOGO_BASE64} 
+                        src={companyLogo || LOGO_BASE64} 
                         alt="Logo Empresa" 
                         className="h-12 max-w-[140px] object-contain bg-white rounded p-1 mr-3" 
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        onError={(e) => { e.currentTarget.src = LOGO_BASE64; }}
                     />
                     <div className="font-bold leading-tight hidden xl:block">
                         <div className="text-[15px] text-white tracking-wide">Matriz de Análisis de Riesgos</div>

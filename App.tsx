@@ -92,6 +92,7 @@ const App: React.FC = () => {
     const[routes, setRoutes] = useState<Route[]>([]);
     const[risks, setRisks] = useState<Risk[]>([]);
     const[siniestros, setSiniestros] = useState<Siniestro[]>([]);
+    const[companyLogo, setCompanyLogo] = useState<string>(() => localStorage.getItem('companyLogo') || '');
     
     const[proximityDistance, setProximityDistance] = useState<number>(() => Number(localStorage.getItem('proximityDistance')) || 50);
     const[showAllRoutes, setShowAllRoutes] = useState(true); 
@@ -111,6 +112,7 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('tg_token', telegramToken); },[telegramToken]);
     useEffect(() => { localStorage.setItem('tg_chat', telegramChatId); },[telegramChatId]);
     useEffect(() => { localStorage.setItem('groupColors', JSON.stringify(groupColors)); },[groupColors]);
+    useEffect(() => { localStorage.setItem('companyLogo', companyLogo); },[companyLogo]);
 
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
@@ -504,6 +506,7 @@ const App: React.FC = () => {
                 onUpdateSiniestro={(updatedSin) => { setSiniestros(prev => prev.map(s => s.id === updatedSin.id ? updatedSin : s)); }}
                 groupColors={groupColors} setGroupColors={setGroupColors}
                 novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate}
+                companyLogo={companyLogo} setCompanyLogo={setCompanyLogo}
                 novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine}
                 showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
                 showRiskTypesRoutes={showRiskTypesRoutes} setShowRiskTypesRoutes={setShowRiskTypesRoutes}
