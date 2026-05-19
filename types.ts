@@ -23,7 +23,7 @@ export interface Siniestro {
     ubicacion: { lat?: number; lng?: number; manual: string; lugar: string; };
     conductor: { nombre: string; legajo: string; interno: string; kilometraje: string; linea: string; };
     descripcion: { tipo: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; gravedad: string; };
-    entorno: { climas: string[]; caminos: string[]; };
+    entorno: { climas: string[]; caminos: string[]; visibilidades?: string[]; };
     datosComplementarios: { 
         nombreTercero: string; dniTercero: string; vehiculoTercero: string; patenteTercero: string; seguroTercero: string; polizaTercero: string;
         intervencionPolicial: boolean; hayTestigos: boolean; testigosInfo: string;

@@ -12,14 +12,19 @@ interface SiniestroFormProps {
     isModal?: boolean; // NUEVO: Identifica si está abierto desde el panel de control
 }
 
+const VISIBILIDAD =['Noche', 'Día', 'Luz Natural', 'Luz Artificial', 'Sin Luz'];
 const CLIMAS =['Niebla', 'Resplandor Solar', 'Lluvia', 'Nieve', 'Granizo', 'Calor extremo', 'Viento Zonda', 'Polvo en suspensión'];
-const CAMINOS =['Asfalto Rugoso', 'Hielo Negro', 'Obra Vial', 'Ripio', 'Serruchos', 'Guardaganado', 'Badén', 'Animales Sueltos', 'Arena en Ruta'];
+const CAMINOS =['Asfalto Rugoso', 'Hielo Negro', 'Obra Vial', 'Ripio', 'Serruchos', 'Guardaganado', 'Badén', 'Animales Sueltos', 'Arena en Ruta', 'Anegamiento (Agua)', 'Aquaplaning (Perdida de adherencia)'];
 const CONSECUENCIAS_DEFAULT: Consecuencia[] =[
     { tipo: 'Solo daños materiales', activa: false, cantidad: '' },
-    { tipo: 'Heridos Leves', activa: false, cantidad: '' },
-    { tipo: 'Heridos Graves', activa: false, cantidad: '' },
+    { tipo: 'Heridos Leves Transportados', activa: false, cantidad: '' },
+    { tipo: 'Heridos Leves No Transportados', activa: false, cantidad: '' },
+    { tipo: 'Heridos Graves Transportados', activa: false, cantidad: '' },
+    { tipo: 'Heridos Graves No Transportados', activa: false, cantidad: '' },
     { tipo: 'Lesionados Transportados', activa: false, cantidad: '' },
-    { tipo: 'Lesionados No Transportados', activa: false, cantidad: '' }
+    { tipo: 'Lesionados No Transportados', activa: false, cantidad: '' },
+    { tipo: 'Fallecidos Transportados', activa: false, cantidad: '' },
+    { tipo: 'Fallecidos No Transportados', activa: false, cantidad: '' }
 ];
 
 export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, onCancel, onRequestMapSelect, isModal }) => {
@@ -31,7 +36,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
     const[f, setF] = useState({
         fechaHora: new Date().toISOString().slice(0,16), ubicacionManual: '', lugar: 'Ciudad',
-        climas: [] as string[], caminos:[] as string[],
+        climas: [] as string[], caminos:[] as string[], visibilidades: [] as string[],
         condNombre: '', condLegajo: '', condInterno: '', condKm: '', condLinea: '',
         descTipo: 'Choque entre vehículos-Moto-Bicicletas', descResumen: '', 
         consecuencias: JSON.parse(JSON.stringify(CONSECUENCIAS_DEFAULT)) as Consecuencia[], 
@@ -56,7 +61,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
     const removeFile = (index: number) => setSelectedFiles(prev => prev.filter((_, i) => i !== index));
 
-    const toggleArray = (arrayName: 'climas' | 'caminos', item: string) => {
+    const toggleArray = (arrayName: 'climas' | 'caminos' | 'visibilidades', item: string) => {
         setF(prev => ({ ...prev, [arrayName]: prev[arrayName].includes(item) ? prev[arrayName].filter(i => i !== item) : [...prev[arrayName], item] }));
     };
 
@@ -87,7 +92,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 ubicacion: { lat: gpsPosition?.lat, lng: gpsPosition?.lng, manual: f.ubicacionManual, lugar: f.lugar },
                 conductor: { nombre: f.condNombre, legajo: f.condLegajo, interno: f.condInterno, kilometraje: f.condKm, linea: f.condLinea },
                 descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores, gravedad: f.gravedad },
-                entorno: { climas: f.climas, caminos: f.caminos },
+                entorno: { climas: f.climas, caminos: f.caminos, visibilidades: f.visibilidades },
                 datosComplementarios: { 
                     nombreTercero: f.tercNombre, dniTercero: f.tercDNI, vehiculoTercero: f.tercVehiculo, patenteTercero: f.tercPatente, seguroTercero: f.tercSeguro, polizaTercero: f.tercPoliza,
                     intervencionPolicial: f.intervencionPolicial, hayTestigos: f.hayTestigos, testigosInfo: f.testigosInfo
@@ -161,6 +166,17 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase font-bold">ZONA:</span>
                             <select name="lugar" value={f.lugar} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none text-sm"><option value="Ciudad">Ciudad</option><option value="Rural">Rural</option><option value="Terminal">Terminal</option><option value="Base">Base</option></select>
                         </label>
+                        
+                        <div className="pt-2 border-t border-gray-700">
+                            <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Visibilidad</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {VISIBILIDAD.map(c => (
+                                    <label key={c} className={`flex items-center gap-2 p-2 rounded text-xs border cursor-pointer transition-colors ${f.visibilidades.includes(c) ? 'bg-sky-900 border-sky-500 text-sky-100' : 'bg-gray-900 border-gray-600 text-gray-400'}`}>
+                                        <input type="checkbox" className="hidden" checked={f.visibilidades.includes(c)} onChange={() => toggleArray('visibilidades', c)} /> {c}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                         
                         <div className="pt-2 border-t border-gray-700">
                             <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Condiciones Climáticas</p>
