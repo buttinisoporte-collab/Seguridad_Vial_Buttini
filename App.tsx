@@ -609,7 +609,7 @@ const App: React.FC = () => {
                                 <Tooltip permanent direction="top" offset={[0, -25]} className="bg-red-600 text-white border-0 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={1}>Siniestro</Tooltip>
                                 <Popup>
                                     <div className="min-w-[250px]">
-                                        <div className="font-bold text-lg leading-tight text-red-600">Reporte Siniestro IRAM</div>
+                                        <div className="font-bold text-lg leading-tight text-red-600">Reporte Siniestro</div>
                                         <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">{new Date(sin.fechaHora).toLocaleString('es-AR')}</div>
                                         
                                         <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
