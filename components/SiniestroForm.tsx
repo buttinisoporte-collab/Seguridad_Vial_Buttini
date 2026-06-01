@@ -57,6 +57,13 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
         }
     },[initialPosition, isModal]);
 
+    // NUEVO: Envía la señal de éxito a la aplicación principal si está dentro de un iframe
+    useEffect(() => {
+        if (step === 2 && window.parent && window.parent !== window) {
+            window.parent.postMessage({ status: 'success_siniestro' }, '*');
+        }
+    }, [step]);
+    
     const handleChange = (e: any) => setF({ ...f, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setSelectedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
     const removeFile = (index: number) => setSelectedFiles(prev => prev.filter((_, i) => i !== index));
@@ -121,7 +128,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
         <div className={`bg-gray-900 text-white flex flex-col relative ${onCancel ? 'h-[85vh]' : 'min-h-screen'}`}>
             <div className="bg-red-600 p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center flex-shrink-0">
                 <div>
-                    <h1 className="text-xl font-bold flex items-center gap-2"><ShieldAlert /> Reporte de Siniestro</h1>
+                    <h1 className="text-xl font-bold flex items-center gap-2"><ShieldAlert /> Reporte de Siniestro - ANTONIO BUTTINI</h1>
                     <p className="text-xs opacity-90">Protocolo IRAM 3810 - Emergencias</p>
                 </div>
                 {onCancel && (
