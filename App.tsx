@@ -37,7 +37,7 @@ const MapFixer = () => {
 
 const MapFocusUpdater = ({ focusPosition }: { focusPosition: Position | null }) => {
     const map = useMap();
-    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 16, { animate: true }); }, [focusPosition, map]);
+    useEffect(() => { if (focusPosition) map.flyTo([focusPosition.lat, focusPosition.lng], 18, { animate: true }); }, [focusPosition, map]);
     return null;
 };
 

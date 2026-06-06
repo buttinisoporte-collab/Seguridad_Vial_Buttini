@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Siniestro, Risk, RiskType, Position, Route } from '../types';
-import { ShieldAlert, Trash2, Folder, MapPin, Edit, Plus, Crosshair } from 'lucide-react';
+import { ShieldAlert, Trash2, Folder, MapPin, Edit, Plus, Crosshair, X } from 'lucide-react';
+import { SiniestroForm } from './SiniestroForm';
 
 interface SiniestrosAdminProps {
     siniestros: Siniestro[];
@@ -28,6 +29,8 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
     const [editDate, setEditDate] = useState('');
     const [editRouteId, setEditRouteId] = useState('');
     const [editGravedad, setEditGravedad] = useState('');
+
+    const [editingSiniestroIram, setEditingSiniestroIram] = useState<Siniestro | null>(null);
     
     const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
     const [filterMonth, setFilterMonth] = useState((new Date().getMonth() + 1).toString());
@@ -57,14 +60,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
     },[siniestros, incidentRisks, filterYear, filterMonth]);
 
     const startEditIram = (sin: Siniestro) => {
-        setEditingId(sin.id);
-        if (sin.timestamp) {
-            const d = new Date(sin.timestamp);
-            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-            setEditDate(d.toISOString().slice(0, 16));
-        } else setEditDate('');
-        setEditRouteId(sin.associatedRouteId || '');
-        setEditGravedad(sin.descripcion?.gravedad || 'Leve');
+        setEditingSiniestroIram(sin);
     };
 
     const startEditManual = (risk: Risk) => {
@@ -143,57 +139,101 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                                     </div>
 
                                     {selectedSiniestroId === sin.id && (
-                                        editingId === sin.id ? (
-                                            <div className="p-4 border-t border-gray-700 bg-gray-900 text-sm space-y-3">
-                                                <label className="block text-[10px] text-gray-400 uppercase">Fecha y Hora</label>
-                                                <input type="datetime-local" value={editDate} onChange={e=>setEditDate(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-white text-xs outline-none" />
-                                                
-                                                <label className="block text-[10px] text-gray-400 uppercase mt-2">Gravedad del Siniestro</label>
-                                                <select value={editGravedad} onChange={e=>setEditGravedad(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-white text-xs outline-none">
-                                                    <option value="Leve">Leve</option>
-                                                    <option value="Moderado">Moderado</option>
-                                                    <option value="Grave">Grave</option>
-                                                    <option value="Solo daños materiales">Solo daños materiales</option>
-                                                    <option value="Fallecidos">Fallecidos</option>
-                                                </select>
+                                        <div className="p-4 border-t border-gray-700 bg-gray-900 text-sm space-y-4">
+                                            <div className="flex justify-between items-start border-b border-gray-700 pb-2">
+                                                <div>
+                                                    <p className="text-[11px] text-gray-400"><b>Ruta Afectada:</b> {sin.associatedRouteId && Array.isArray(routes) ? routes.find(r=>r.id===sin.associatedRouteId)?.name : `Línea ${sin.conductor?.linea} (Genérico)`}</p>
+                                                </div>
+                                                <div className="flex flex-col gap-1 items-end">
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setRelocatingSiniestroId(relocatingSiniestroId === sin.id ? null : sin.id); }} 
+                                                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded ${relocatingSiniestroId === sin.id ? 'bg-sky-600 text-white font-bold animate-pulse' : 'bg-gray-700 hover:bg-gray-600 text-sky-400'}`}
+                                                        >
+                                                            <Crosshair size={12}/> {relocatingSiniestroId === sin.id ? 'Elegir en el mapa...' : 'Reubicar Punto'}
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); startEditIram(sin); }} className="flex items-center gap-1 text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-sky-400"><Edit size={12}/> Editar Info</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* General Info */}
+                                            <div>
+                                                <h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">1. Ubicación y Entorno</h4>
+                                                <p className="text-gray-300"><MapPin size={12} className="inline mr-1"/> {sin.ubicacion?.manual} ({sin.ubicacion?.lugar})</p>
+                                                <p className="text-[11px] text-gray-400 mt-1"><b>Visibilidad:</b> {(Array.isArray(sin.entorno?.visibilidades) && sin.entorno.visibilidades.length > 0) ? sin.entorno.visibilidades.join(', ') : 'No especificada'}</p>
+                                                <p className="text-[11px] text-gray-400 mt-1"><b>Clima:</b> {(Array.isArray(sin.entorno?.climas) && sin.entorno.climas.length > 0) ? sin.entorno.climas.join(', ') : 'No especificado'}</p>
+                                                <p className="text-[11px] text-gray-400"><b>Camino:</b> {(Array.isArray(sin.entorno?.caminos) && sin.entorno.caminos.length > 0) ? sin.entorno.caminos.join(', ') : 'No especificado'}</p>
+                                            </div>
 
-                                                <label className="block text-[10px] text-gray-400 uppercase mt-2">Recorrido Afectado (Opcional)</label>
-                                                <select value={editRouteId} onChange={e=>setEditRouteId(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-white text-xs outline-none">
-                                                    <option value="">No aplica / Default de Línea</option>
-                                                    {Array.isArray(routes) && routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                                </select>
-                                                <div className="flex gap-2 justify-end mt-3">
-                                                    <button onClick={() => setEditingId(null)} className="px-3 py-1 bg-gray-600 text-white rounded text-xs">Cancelar</button>
-                                                    <button onClick={() => saveIramEdit(sin)} className="px-3 py-1 bg-sky-500 text-white rounded text-xs font-bold">Guardar</button>
+                                            {/* Conductor y Unidad */}
+                                            <div>
+                                                <h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">2. Conductor y Unidad</h4>
+                                                <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-400">
+                                                    <p><b>Nombre:</b> {sin.conductor?.nombre || 'N/A'}</p>
+                                                    <p><b>Legajo:</b> {sin.conductor?.legajo || 'N/A'}</p>
+                                                    <p><b>Línea:</b> {sin.conductor?.linea || 'N/A'}</p>
+                                                    <p><b>Interno:</b> {sin.conductor?.interno || 'N/A'}</p>
+                                                    <p><b>KM:</b> {sin.conductor?.kilometraje || 'N/A'}</p>
                                                 </div>
                                             </div>
-                                        ) : (
-                                            <div className="p-4 border-t border-gray-700 bg-gray-900 text-sm space-y-4">
-                                                <div className="flex justify-between items-start border-b border-gray-700 pb-2">
-                                                    <div>
-                                                        <p className="text-[11px] text-gray-400"><b>Ruta Afectada:</b> {sin.associatedRouteId && Array.isArray(routes) ? routes.find(r=>r.id===sin.associatedRouteId)?.name : `Línea ${sin.conductor?.linea} (Genérico)`}</p>
-                                                    </div>
-                                                    <div className="flex flex-col gap-1 items-end">
-                                                        <div className="flex gap-2">
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); setRelocatingSiniestroId(relocatingSiniestroId === sin.id ? null : sin.id); }} 
-                                                                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded ${relocatingSiniestroId === sin.id ? 'bg-sky-600 text-white font-bold animate-pulse' : 'bg-gray-700 hover:bg-gray-600 text-sky-400'}`}
-                                                            >
-                                                                <Crosshair size={12}/> {relocatingSiniestroId === sin.id ? 'Elegir en el mapa...' : 'Reubicar Punto'}
-                                                            </button>
-                                                            <button onClick={() => startEditIram(sin)} className="flex items-center gap-1 text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-sky-400"><Edit size={12}/> Editar Info</button>
-                                                        </div>
-                                                    </div>
+
+                                            {/* Descripción */}
+                                            <div>
+                                                <h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">3. Detalles</h4>
+                                                <p className="text-red-400 font-bold mb-1 text-xs">Tipo: {sin.descripcion?.tipo || 'N/A'}</p>
+                                                <p className="text-red-400 font-bold mb-1 text-xs">Gravedad: {sin.descripcion?.gravedad || 'No especificada'}</p>
+                                                <p className="text-gray-300 italic bg-gray-800 p-2 rounded mb-2 text-xs">"{sin.descripcion?.resumen}"</p>
+                                                <p className="text-xs text-gray-400"><b>Factores causales:</b> {sin.descripcion?.factoresCausales}</p>
+                                                
+                                                <div className="mt-2 text-xs text-gray-300">
+                                                    <b>Consecuencias del siniestro:</b>
+                                                    <ul className="list-disc list-inside mt-1 text-gray-400">
+                                                        {(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias :[]).filter(c => c.activa).map(c => (
+                                                            <li key={c.tipo}>{c.tipo} {c.cantidad ? `(${c.cantidad})` : ''}</li>
+                                                        ))}
+                                                        {(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias :[]).filter(c => c.activa).length === 0 && (
+                                                            <li>No se informaron consecuencias</li>
+                                                        )}
+                                                    </ul>
                                                 </div>
-                                                <div><h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">Ubicación y Entorno</h4><p className="text-gray-300"><MapPin size={12} className="inline mr-1"/> {sin.ubicacion?.manual} ({sin.ubicacion?.lugar})</p><p className="text-[11px] text-gray-400 mt-1">Clima: {(Array.isArray(sin.entorno?.climas) ? sin.entorno.climas :[]).join(', ')}</p><p className="text-[11px] text-gray-400">Camino: {(Array.isArray(sin.entorno?.caminos) ? sin.entorno.caminos :[]).join(', ')}</p></div>
-                                                <div><h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">Detalles</h4><p className="text-red-400 font-bold mb-1">Gravedad: {sin.descripcion?.gravedad || 'No especificada'}</p><p className="text-gray-300 italic bg-gray-800 p-2 rounded mb-2">"{sin.descripcion?.resumen}"</p><p className="text-xs text-gray-400"><b>Factores:</b> {sin.descripcion?.factoresCausales}</p>
-                                                    <div className="mt-2"><p className="text-xs font-bold text-gray-300">Consecuencias:</p><ul className="list-disc list-inside text-[11px] text-gray-400">{(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias :[]).filter(c => c.activa).map(c => (<li key={c.tipo}>{c.tipo} {c.cantidad ? `(${c.cantidad})` : ''}</li>))}</ul></div>
-                                                </div>
-                                                <div><h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">Datos Complementarios</h4><p className="text-gray-300 text-xs"><b>Tercero:</b> {sin.datosComplementarios?.nombreTercero || 'N/A'} - {sin.datosComplementarios?.vehiculoTercero} ({sin.datosComplementarios?.patenteTercero})</p><p className="text-gray-300 text-xs"><b>Seguro:</b> {sin.datosComplementarios?.seguroTercero}</p><p className="text-gray-300 text-xs mt-1"><b>Policía:</b> {sin.datosComplementarios?.intervencionPolicial ? 'Sí' : 'No'}</p>{sin.datosComplementarios?.hayTestigos && <p className="text-gray-300 text-xs italic">Testigos: {sin.datosComplementarios?.testigosInfo}</p>}</div>
-                                                {(Array.isArray(sin.images) && sin.images.length > 0) && (<div><h4 className="text-sky-400 font-bold mb-2 border-b border-gray-700 pb-1">Fotografías ({sin.images.length})</h4><div className="grid grid-cols-3 gap-2">{sin.images.map((img, idx) => (<a key={idx} href={img} target="_blank" rel="noreferrer"><img src={img} alt="Siniestro" className="w-full h-16 object-cover rounded border border-gray-600 hover:border-sky-500" /></a>))}</div></div>)}
-                                                {sin.driveUrl && (<div className="pt-2"><a href={sin.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-xs"><Folder size={16}/> Carpeta Externa Drive</a></div>)}
                                             </div>
-                                        )
+
+                                            {/* Datos Complementarios */}
+                                            <div>
+                                                <h4 className="text-sky-400 font-bold mb-1 border-b border-gray-700 pb-1">4. Datos Complementarios</h4>
+                                                {sin.datosComplementarios?.nombreTercero || sin.datosComplementarios?.vehiculoTercero ? (
+                                                    <div className="text-xs text-gray-400 mb-2">
+                                                        <p><b>Tercero:</b> {sin.datosComplementarios.nombreTercero || 'N/A'} - {sin.datosComplementarios.vehiculoTercero} {sin.datosComplementarios.patenteTercero ? `(${sin.datosComplementarios.patenteTercero})`:''}</p>
+                                                        <p><b>Seguro/Póliza:</b> {sin.datosComplementarios.seguroTercero || 'N/A'} - {sin.datosComplementarios.polizaTercero || 'N/A'}</p>
+                                                    </div>
+                                                ) : <p className="text-[11px] text-gray-500 mb-2">No hubo terceros involucrados.</p>}
+                                                
+                                                <p className="text-gray-300 text-xs"><b>Intervención Policial:</b> {sin.datosComplementarios?.intervencionPolicial ? 'Sí' : 'No'}</p>
+                                                <p className="text-gray-300 text-xs mt-1"><b>Testigos:</b> {sin.datosComplementarios?.hayTestigos ? (sin.datosComplementarios?.testigosInfo || 'Sí') : 'No'}</p>
+                                            </div>
+
+                                            {/* Archivos Adjuntos */}
+                                            {(Array.isArray(sin.images) && sin.images.length > 0) && (
+                                                <div>
+                                                    <h4 className="text-sky-400 font-bold mb-2 border-b border-gray-700 pb-1">Fotografías ({sin.images.length})</h4>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {sin.images.map((img, idx) => (
+                                                            <a key={idx} href={img} target="_blank" rel="noreferrer">
+                                                                <img src={img} alt="Siniestro" className="w-full h-16 object-cover rounded border border-gray-600 hover:border-sky-500" />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {sin.driveUrl && (
+                                                <div className="pt-2">
+                                                    <a href={sin.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-xs">
+                                                        <Folder size={16}/> Carpeta Externa Drive
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             );
@@ -279,6 +319,22 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                     })
                 )}
             </div>
+
+            {editingSiniestroIram && (
+                <div className="fixed inset-0 z-[100] bg-black bg-opacity-80 flex items-center justify-center p-4">
+                    <div className="bg-gray-900 rounded-xl overflow-hidden w-full max-w-2xl max-h-[90vh] flex flex-col relative shadow-2xl border border-gray-700">
+                        <SiniestroForm
+                            isModal={true}
+                            initialSiniestro={editingSiniestroIram}
+                            hideFiles={true}
+                            onCancel={() => setEditingSiniestroIram(null)}
+                            onSaveSiniestro={async (updatedSin) => {
+                                onUpdateSiniestro(updatedSin);
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

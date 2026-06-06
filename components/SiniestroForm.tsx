@@ -7,6 +7,8 @@ import { uploadSiniestroImage } from '../lib/firebase';
 interface SiniestroFormProps { 
     onSaveSiniestro: (sin: Siniestro) => Promise<void>; 
     initialPosition?: { lat: number; lng: number; }; 
+    initialSiniestro?: Siniestro;
+    hideFiles?: boolean;
     onCancel?: () => void; 
     onRequestMapSelect?: () => void;
     isModal?: boolean; // NUEVO: Identifica si está abierto desde el panel de control
@@ -27,7 +29,7 @@ const CONSECUENCIAS_DEFAULT: Consecuencia[] =[
     { tipo: 'Fallecidos No Transportados', activa: false, cantidad: '' }
 ];
 
-export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, onCancel, onRequestMapSelect, isModal }) => {
+export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, initialPosition, initialSiniestro, hideFiles, onCancel, onRequestMapSelect, isModal }) => {
     const[step, setStep] = useState(1);
     const[isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
@@ -46,7 +48,52 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
     });
 
     useEffect(() => {
-        if (initialPosition) {
+        if (initialSiniestro) {
+            if (initialSiniestro.ubicacion.lat && initialSiniestro.ubicacion.lng) {
+                setGpsPosition({ lat: initialSiniestro.ubicacion.lat, lng: initialSiniestro.ubicacion.lng });
+            }
+            
+            // Merge existing consequences with default to ensure all options are present
+            const mergedConsecuencias = JSON.parse(JSON.stringify(CONSECUENCIAS_DEFAULT)) as Consecuencia[];
+            if (Array.isArray(initialSiniestro.descripcion?.consecuencias)) {
+                initialSiniestro.descripcion.consecuencias.forEach(ic => {
+                    const found = mergedConsecuencias.find(mc => mc.tipo === ic.tipo);
+                    if (found) { found.activa = ic.activa; found.cantidad = ic.cantidad; }
+                    else mergedConsecuencias.push(ic);
+                });
+            }
+
+            setF({
+                fechaHora: initialSiniestro.fechaHora ? new Date(initialSiniestro.fechaHora).toISOString().slice(0,16) : new Date(initialSiniestro.timestamp).toISOString().slice(0,16),
+                ubicacionManual: initialSiniestro.ubicacion.manual || '',
+                lugar: initialSiniestro.ubicacion.lugar || 'Ciudad',
+                climas: initialSiniestro.entorno?.climas || [],
+                caminos: initialSiniestro.entorno?.caminos || [],
+                visibilidades: initialSiniestro.entorno?.visibilidades || [],
+                condNombre: initialSiniestro.conductor?.nombre || '',
+                condLegajo: initialSiniestro.conductor?.legajo || '',
+                condInterno: initialSiniestro.conductor?.interno || '',
+                condKm: initialSiniestro.conductor?.kilometraje || '',
+                condLinea: initialSiniestro.conductor?.linea || '',
+                descTipo: initialSiniestro.descripcion?.tipo || 'Choque entre vehículos-Moto-Bicicletas',
+                descResumen: initialSiniestro.descripcion?.resumen || '',
+                consecuencias: mergedConsecuencias,
+                descFactores: initialSiniestro.descripcion?.factoresCausales || 'Factor Humano (error, descripción, velocidad)',
+                gravedad: initialSiniestro.descripcion?.gravedad || 'Leve',
+                tercInvolucrado: !!initialSiniestro.datosComplementarios?.nombreTercero || !!initialSiniestro.datosComplementarios?.vehiculoTercero,
+                tercNombre: initialSiniestro.datosComplementarios?.nombreTercero || '',
+                tercDNI: initialSiniestro.datosComplementarios?.dniTercero || '',
+                tercVehiculo: initialSiniestro.datosComplementarios?.vehiculoTercero || '',
+                tercPatente: initialSiniestro.datosComplementarios?.patenteTercero || '',
+                tercSeguro: initialSiniestro.datosComplementarios?.seguroTercero || '',
+                tercPoliza: initialSiniestro.datosComplementarios?.polizaTercero || '',
+                intervencionPolicial: initialSiniestro.datosComplementarios?.intervencionPolicial || false,
+                hayTestigos: initialSiniestro.datosComplementarios?.hayTestigos || false,
+                testigosInfo: initialSiniestro.datosComplementarios?.testigosInfo || '',
+                driveUrl: initialSiniestro.driveUrl || ''
+            });
+
+        } else if (initialPosition) {
             setGpsPosition(initialPosition);
         } else if (!isModal) {
             // Solo busca GPS si NO es modal (es decir, si es el conductor en la calle)
@@ -55,7 +102,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 () => console.warn("GPS no disponible"), { enableHighAccuracy: true }
             );
         }
-    },[initialPosition, isModal]);
+    },[initialPosition, isModal, initialSiniestro]);
 
     // NUEVO: Envía la señal de éxito a la aplicación principal si está dentro de un iframe
     useEffect(() => {
@@ -80,12 +127,12 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isModal && selectedFiles.length === 0) return alert("Debe adjuntar al menos una fotografía del hecho.");
+        if (!isModal && !initialSiniestro && selectedFiles.length === 0) return alert("Debe adjuntar al menos una fotografía del hecho.");
         if (isModal && !gpsPosition && !f.ubicacionManual) return alert("Debe seleccionar una ubicación en el mapa o ingresarla manualmente.");
         
         setIsSubmitting(true);
-        const siniestroId = uuidv4();
-        const uploadedImageUrls: string[] =[];
+        const siniestroId = initialSiniestro?.id || uuidv4();
+        const uploadedImageUrls: string[] = initialSiniestro?.images ? [...initialSiniestro.images] : [];
 
         try {
             for (let i = 0; i < selectedFiles.length; i++) {
@@ -95,7 +142,8 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
             }
 
             const newSiniestro: Siniestro = {
-                id: siniestroId, timestamp: Date.now(), fechaHora: f.fechaHora,
+                ...initialSiniestro, // Retain other missing properties if any
+                id: siniestroId, timestamp: initialSiniestro?.timestamp || Date.now(), fechaHora: f.fechaHora,
                 ubicacion: { lat: gpsPosition?.lat, lng: gpsPosition?.lng, manual: f.ubicacionManual, lugar: f.lugar },
                 conductor: { nombre: f.condNombre, legajo: f.condLegajo, interno: f.condInterno, kilometraje: f.condKm, linea: f.condLinea },
                 descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores, gravedad: f.gravedad },
@@ -108,7 +156,11 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
             };
 
             await onSaveSiniestro(newSiniestro);
-            setStep(2);
+            if (!initialSiniestro) {
+                setStep(2);
+            } else {
+                if (onCancel) onCancel();
+            }
         } catch (error) { alert("Error al subir las imágenes. Verifique su conexión."); }
         setIsSubmitting(false);
     };
@@ -302,29 +354,31 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 </div>
 
                 {/* SECCION 5 (Antes Fotografias) */}
-                <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md pb-8">
-                    <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">5. Fotografías del Hecho {isModal && "(Opcional)"}</h2>
-                    <p className="text-[11px] text-gray-400 mb-4 italic">Suba fotos de: daños propios, daños terceros, posición de vehículos (TOME FOTOS PANORÁMICAS) y documentos (TOME FOTOS ENFOCADAS Y CLARAS).</p>
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors bg-gray-900/50">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6"><Camera size={32} className="text-sky-500 mb-2" /><p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p></div>
-                        <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileSelect} />
-                    </label>
-                    {selectedFiles.length > 0 && (
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            {selectedFiles.map((file, index) => (
-                                <div key={index} className="relative bg-gray-900 p-2 rounded border border-gray-700 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 overflow-hidden"><ImageIcon size={14} className="text-gray-500 flex-shrink-0" /><span className="text-[10px] truncate text-gray-300">{file.name}</span></div>
-                                    <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-400 p-1"><Trash2 size={14} /></button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                {!hideFiles && (
+                    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md pb-8">
+                        <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">5. Fotografías del Hecho {isModal && "(Opcional)"}</h2>
+                        <p className="text-[11px] text-gray-400 mb-4 italic">Suba fotos de: daños propios, daños terceros, posición de vehículos (TOME FOTOS PANORÁMICAS) y documentos (TOME FOTOS ENFOCADAS Y CLARAS).</p>
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors bg-gray-900/50">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6"><Camera size={32} className="text-sky-500 mb-2" /><p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p></div>
+                            <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileSelect} />
+                        </label>
+                        {selectedFiles.length > 0 && (
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                {selectedFiles.map((file, index) => (
+                                    <div key={index} className="relative bg-gray-900 p-2 rounded border border-gray-700 flex items-center justify-between">
+                                        <div className="flex items-center gap-2 overflow-hidden"><ImageIcon size={14} className="text-gray-500 flex-shrink-0" /><span className="text-[10px] truncate text-gray-300">{file.name}</span></div>
+                                        <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-400 p-1"><Trash2 size={14} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="sticky bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-50 flex-shrink-0">
                 <button type="submit" onClick={handleSubmit} disabled={isSubmitting} className={`w-full ${isSubmitting ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-500'} text-white font-bold text-lg py-4 rounded-xl shadow-lg flex flex-col items-center justify-center transition-all active:scale-95`}>
-                    <span>{isSubmitting ? 'PROCESANDO...' : 'REGISTRAR SINIESTRO'}</span>
+                    <span>{isSubmitting ? 'PROCESANDO...' : (initialSiniestro ? 'GUARDAR CAMBIOS' : 'REGISTRAR SINIESTRO')}</span>
                     {isSubmitting && <span className="text-[10px] font-normal animate-pulse">{uploadProgress}</span>}
                 </button>
             </div>
