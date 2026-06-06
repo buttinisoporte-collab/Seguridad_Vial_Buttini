@@ -43,7 +43,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
         const safeIncidentRisks = Array.isArray(incidentRisks) ? incidentRisks :[];
         
         let list =[
-            ...safeSiniestros.map(s => ({ type: 'iram', data: s as any, ts: s.timestamp })),
+            ...safeSiniestros.map(s => ({ type: 'iram', data: s as any, ts: s.fechaHora ? new Date(s.fechaHora).getTime() : s.timestamp })),
             ...safeIncidentRisks.map(r => ({ type: 'manual', data: r as any, ts: r.timestamp || 0 }))
         ];
         

@@ -57,16 +57,17 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
     return false;
 };
 
-const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: Siniestro[], activeTab?: string }> = ({ routes, risks, siniestros, activeTab }) => {
+const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: Siniestro[], activeTab?: string, focusPosition?: Position | null }> = ({ routes, risks, siniestros, activeTab, focusPosition }) => {
     const map = useMap();
     useEffect(() => {
+        if (focusPosition) return; // Skip bounds logic when there's a focused position
         const points: LatLngExpression[] =[];
         if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features && Array.isArray(r.geoJson.features)) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
         if (Array.isArray(risks)) risks.forEach(r => { if (r?.position?.lat && r?.position?.lng) points.push([r.position.lat, r.position.lng]); });
         if (activeTab === 'siniestros' && Array.isArray(siniestros)) { siniestros.forEach(s => { if (s?.ubicacion?.lat && s?.ubicacion?.lng) points.push([s.ubicacion.lat, s.ubicacion.lng]); }); }
         if (Array.isArray(points) && points.length > 0) map.fitBounds(L.latLngBounds(points), { padding:[50, 50], maxZoom: 15 });
         else map.setView(SAN_RAFAEL_CENTER, 13);
-    },[routes, risks, siniestros, activeTab, map]);
+    },[routes, risks, siniestros, activeTab, map, focusPosition]);
     return null;
 };
 
@@ -519,7 +520,7 @@ const App: React.FC = () => {
                     <MapFixer />
                     <MapFocusUpdater focusPosition={focusPosition} />
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
-                    <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} />
+                    <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={siniestros} activeTab={activeTab} focusPosition={focusPosition} />
                     {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}
 
                     {Array.isArray(visibleRoutes) && visibleRoutes.map(route => {
