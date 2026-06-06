@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { MapPin, AlertTriangle, CheckCircle, Navigation, AlertOctagon, Construction, Zap, Info, LogOut, User as UserIcon, Users } from 'lucide-react';
+import { MapPin, AlertTriangle, CheckCircle, Navigation, AlertOctagon, Construction, Zap, Info, LogOut, User as UserIcon, Users, CreditCard } from 'lucide-react';
 import type { Risk, DriverReportDetails, Position, User, Route } from '../types';
 
 interface DriverAppProps {
@@ -17,6 +17,7 @@ const CATEGORIAS_IRAM =[
     { id: 'desvio', name: 'Corte/Desvío', desc: 'Obra, evento, accidente', icon: <Navigation size={32}/>, color: '#8b5cf6' },
     { id: 'riesgo', name: 'Punto de Riesgo', desc: 'Agua, baja visibilidad, animales', icon: <AlertTriangle size={32}/>, color: '#3b82f6' },
     { id: 'pasajeros', name: 'Problemática Pasajeros', desc: 'Falta de pago, agresión, menores, etc.', icon: <Users size={32}/>, color: '#ec4899' },
+    { id: 'sube', name: 'SUBE', desc: 'Consola no responde, no cobra, etc.', icon: <CreditCard size={32}/>, color: '#ff6b00' },
 ];
 
 const UNIDADES_HABILITADAS = Array.from({length: 150}, (_, i) => (i + 1).toString().padStart(3, '0'));
@@ -37,6 +38,9 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
     const[velocidadSugerida, setVelocidadSugerida] = useState('');
     const[carrilRecomendado, setCarrilRecomendado] = useState('');
     const[observaciones, setObservaciones] = useState('');
+    
+    const[subeProblema, setSubeProblema] = useState('');
+    const[subePasajerosSinCobrar, setSubePasajerosSinCobrar] = useState('');
 
     useEffect(() => {
         navigator.geolocation.getCurrentPosition(
@@ -55,14 +59,21 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
         const driverDetails: DriverReportDetails = {
             unidad, linea, sentido, categoriaIRAM: categoria.name,
             huboDesvio, rutaAlternativa, velocidadSugerida, carrilRecomendado, ubicacionManual,
+            subeProblema, subePasajerosSinCobrar,
             conductorName: currentDriver.name
         };
+
+        let finalDescription = observaciones || `Reporte: ${categoria.name}`;
+        if (categoria.id === 'sube') {
+            finalDescription = `Problema SUBE: ${subeProblema}${subePasajerosSinCobrar ? ` | Pasajeros sin cobrar: ${subePasajerosSinCobrar}` : ''}`;
+            if (observaciones) finalDescription += ` | Obs: ${observaciones}`;
+        }
 
         const newRisk: Risk = {
             id: uuidv4(),
             position: gpsPosition || { lat: -34.6175, lng: -68.335 },
             riskTypeId: 'incidente-ruta',
-            description: observaciones || `Reporte IRAM: ${categoria.name}`,
+            description: finalDescription,
             associatedRouteIds:[], images:[], driverReportDetails: driverDetails,
             timestamp: Date.now()
         };
@@ -70,7 +81,7 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
         onSaveReport(newRisk); setStep(3);
     };
 
-    const resetForm = () => { setCategoria(null); setHuboDesvio(false); setRutaAlternativa(''); setVelocidadSugerida(''); setCarrilRecomendado(''); setObservaciones(''); setUbicacionManual(''); setStep(1); };
+    const resetForm = () => { setCategoria(null); setHuboDesvio(false); setRutaAlternativa(''); setVelocidadSugerida(''); setCarrilRecomendado(''); setObservaciones(''); setUbicacionManual(''); setSubeProblema(''); setSubePasajerosSinCobrar(''); setStep(1); };
 
     if (step === 1) {
         return (
@@ -132,8 +143,8 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
                     {gpsStatus !== 'ok' && <input type="text" value={ubicacionManual} onChange={e=>setUbicacionManual(e.target.value)} placeholder="Calle/Intersección..." className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm outline-none text-white" required />}
                 </div>
 
-                {/* ESTOS BLOQUES AHORA SE OCULTAN SI LA CATEGORÍA ES 'PASAJEROS' */}
-                {categoria?.id !== 'pasajeros' && (
+                {/* ESTOS BLOQUES AHORA SE OCULTAN SI LA CATEGORÍA ES 'PASAJEROS' o 'SUBE' */}
+                {categoria?.id !== 'pasajeros' && categoria?.id !== 'sube' && (
                     <>
                         <div>
                             <label className="block text-xs text-gray-400 mb-2">Sentido</label>
@@ -152,9 +163,33 @@ export const DriverApp: React.FC<DriverAppProps> = ({ routes, currentDriver, onS
                     </>
                 )}
 
+                {categoria?.id === 'sube' && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm text-gray-300 mb-2">Problema</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['CONSOLA NO RESPONDE', 'SINCRONIZANDO', 'NO COBRA QR', 'APAGADA', 'NO ACREDITA CARGAS'].map(prob => (
+                                    <button 
+                                        type="button" 
+                                        key={prob} 
+                                        onClick={() => setSubeProblema(prob)} 
+                                        className={`flex-1 min-w-[30%] py-3 px-2 rounded-lg text-[11px] font-bold border transition-colors ${subeProblema === prob ? 'bg-[#0088ce] border-[#0088ce] text-white' : 'bg-gray-800 border-gray-600 text-white'}`}
+                                    >
+                                        {prob}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex flex-col mt-4">
+                            <label className="text-xs text-gray-400 mb-1">Pasajeros Transportados sin cobrar</label>
+                            <textarea value={subePasajerosSinCobrar} onChange={e=>setSubePasajerosSinCobrar(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white outline-none focus:border-sky-500" rows={2} />
+                        </div>
+                    </div>
+                )}
+
                 <div>
                     <label className="flex items-center gap-1 text-xs text-gray-400 mb-1"><Info size={14}/> Detalles de la problemática / Observaciones</label>
-                    <textarea rows={4} value={observaciones} onChange={e=>setObservaciones(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500 text-white" placeholder="Escriba aquí los detalles..." required={categoria.id === 'pasajeros'}></textarea>
+                    <textarea rows={4} value={observaciones} onChange={e=>setObservaciones(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-sky-500 text-white" placeholder="Escriba aquí los detalles..." required={categoria?.id === 'pasajeros'}></textarea>
                 </div>
 
                 <div className="fixed bottom-0 left-0 w-full p-4 bg-gray-900 border-t border-gray-800 z-50">

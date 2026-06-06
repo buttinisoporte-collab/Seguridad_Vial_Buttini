@@ -7,6 +7,7 @@ export interface DriverReportDetails {
     unidad: string; linea: string; sentido: string; categoriaIRAM: string;
     huboDesvio: boolean; rutaAlternativa?: string; velocidadSugerida?: string;
     carrilRecomendado?: string; ubicacionManual?: string; conductorName?: string;
+    subeProblema?: string; subePasajerosSinCobrar?: string;
 }
 
 export interface Risk {
