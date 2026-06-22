@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { Siniestro, Risk, RiskType, Position, Route } from '../types';
 import { ShieldAlert, Trash2, Folder, MapPin, Edit, Plus, Crosshair, X } from 'lucide-react';
 import { SiniestroForm } from './SiniestroForm';
@@ -32,17 +32,18 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
 
     const [editingSiniestroIram, setEditingSiniestroIram] = useState<Siniestro | null>(null);
     
+    // FILTRO POR DEFECTO: Año actual y Todos los Meses ('')
     const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
-    const [filterMonth, setFilterMonth] = useState((new Date().getMonth() + 1).toString());
+    const [filterMonth, setFilterMonth] = useState('');
 
     // Generate years from 2020 to current
     const years = Array.from({ length: new Date().getFullYear() - 2020 + 2 }, (_, i) => (2020 + i).toString());
 
     const unifiedList = useMemo(() => {
-        const safeSiniestros = Array.isArray(siniestros) ? siniestros :[];
-        const safeIncidentRisks = Array.isArray(incidentRisks) ? incidentRisks :[];
+        const safeSiniestros = Array.isArray(siniestros) ? siniestros : [];
+        const safeIncidentRisks = Array.isArray(incidentRisks) ? incidentRisks : [];
         
-        let list =[
+        let list = [
             ...safeSiniestros.map(s => ({ type: 'iram', data: s as any, ts: s.fechaHora ? new Date(s.fechaHora).getTime() : s.timestamp })),
             ...safeIncidentRisks.map(r => ({ type: 'manual', data: r as any, ts: r.timestamp || 0 }))
         ];
@@ -57,7 +58,19 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
         }
         
         return list.sort((a, b) => b.ts - a.ts);
-    },[siniestros, incidentRisks, filterYear, filterMonth]);
+    }, [siniestros, incidentRisks, filterYear, filterMonth]);
+
+    // NUEVO: Efecto para hacer auto-scroll a la tarjeta cuando se toca en el mapa (selectedSiniestroId)
+    useEffect(() => {
+        if (selectedSiniestroId) {
+            setTimeout(() => {
+                const elemento = document.getElementById(`siniestro-card-${selectedSiniestroId}`);
+                if (elemento) {
+                    elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+    }, [selectedSiniestroId]);
 
     const startEditIram = (sin: Siniestro) => {
         setEditingSiniestroIram(sin);
@@ -77,7 +90,7 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
     const saveManualEdit = (risk: Risk) => {
         const updatedRisk = { ...risk, gravedad: editGravedad };
         if (editDate) updatedRisk.timestamp = new Date(editDate).getTime();
-        updatedRisk.associatedRouteIds = editRouteId ? [editRouteId] :[];
+        updatedRisk.associatedRouteIds = editRouteId ? [editRouteId] : [];
         onUpdateRisk(updatedRisk);
         setEditingId(null);
     };
@@ -117,15 +130,19 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                 </select>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 scroll-smooth">
                 {Array.isArray(unifiedList) && unifiedList.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500"><ShieldAlert size={40} className="mx-auto mb-2 opacity-50" /><p>No hay siniestros registrados.</p></div>
+                    <div className="text-center py-10 text-gray-500"><ShieldAlert size={40} className="mx-auto mb-2 opacity-50" /><p>No hay siniestros registrados para este filtro.</p></div>
                 ) : (
                     Array.isArray(unifiedList) && unifiedList.map(item => {
                         if (item.type === 'iram') {
                             const sin = item.data as Siniestro;
                             return (
-                                <div key={sin.id} className={`bg-gray-800 border transition-colors rounded-lg shadow-md overflow-hidden ${selectedSiniestroId === sin.id ? 'border-red-500' : 'border-gray-700'}`}>
+                                <div 
+                                    key={sin.id} 
+                                    id={`siniestro-card-${sin.id}`}
+                                    className={`bg-gray-800 border transition-all duration-300 rounded-lg shadow-md overflow-hidden ${selectedSiniestroId === sin.id ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] bg-gray-800' : 'border-gray-700'}`}
+                                >
                                     <div className="p-4 cursor-pointer hover:bg-gray-750 flex justify-between items-center" onClick={() => { setSelectedSiniestroId(selectedSiniestroId === sin.id ? null : sin.id); if (sin.ubicacion?.lat && sin.ubicacion?.lng) onFocusPosition({ lat: sin.ubicacion.lat, lng: sin.ubicacion.lng }); }}>
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -189,10 +206,10 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                                                 <div className="mt-2 text-xs text-gray-300">
                                                     <b>Consecuencias del siniestro:</b>
                                                     <ul className="list-disc list-inside mt-1 text-gray-400">
-                                                        {(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias :[]).filter(c => c.activa).map(c => (
+                                                        {(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias : []).filter(c => c.activa).map(c => (
                                                             <li key={c.tipo}>{c.tipo} {c.cantidad ? `(${c.cantidad})` : ''}</li>
                                                         ))}
-                                                        {(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias :[]).filter(c => c.activa).length === 0 && (
+                                                        {(Array.isArray(sin.descripcion?.consecuencias) ? sin.descripcion.consecuencias : []).filter(c => c.activa).length === 0 && (
                                                             <li>No se informaron consecuencias</li>
                                                         )}
                                                     </ul>
@@ -242,7 +259,11 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                             const risk = item.data as Risk;
                             const rt = Array.isArray(riskTypes) ? riskTypes.find(t => t.id === risk.riskTypeId) : null;
                             return (
-                                <div key={risk.id} className={`bg-gray-800 border transition-colors rounded-lg shadow-md overflow-hidden ${selectedSiniestroId === risk.id ? 'border-orange-500' : 'border-gray-700'}`}>
+                                <div 
+                                    key={risk.id} 
+                                    id={`siniestro-card-${risk.id}`}
+                                    className={`bg-gray-800 border transition-all duration-300 rounded-lg shadow-md overflow-hidden ${selectedSiniestroId === risk.id ? 'border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.3)] bg-gray-800' : 'border-gray-700'}`}
+                                >
                                     <div className="p-4 cursor-pointer hover:bg-gray-750 flex justify-between items-center" onClick={() => { setSelectedSiniestroId(selectedSiniestroId === risk.id ? null : risk.id); if (risk.position) onFocusPosition(risk.position); }}>
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
