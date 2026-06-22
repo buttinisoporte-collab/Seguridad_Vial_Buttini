@@ -60,7 +60,7 @@ const isPointNearRoute = (position: Position, geoJson: RouteGeoJSON, distanceThr
 const MapBoundsUpdater: React.FC<{ routes: Route[], risks: Risk[], siniestros?: Siniestro[], activeTab?: string, focusPosition?: Position | null }> = ({ routes, risks, siniestros, activeTab, focusPosition }) => {
     const map = useMap();
     useEffect(() => {
-        if (focusPosition) return; // Skip bounds logic when there's a focused position
+        if (focusPosition) return;
         const points: LatLngExpression[] =[];
         if (Array.isArray(routes)) routes.forEach(r => { if (r?.geoJson?.features && Array.isArray(r.geoJson.features)) r.geoJson.features.forEach(f => { if (f?.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates)) f.geometry.coordinates.forEach(c => { if (Array.isArray(c) && c.length>=2) points.push([c[1], c[0]]); }); }); });
         if (Array.isArray(risks)) risks.forEach(r => { if (r?.position?.lat && r?.position?.lng) points.push([r.position.lat, r.position.lng]); });
@@ -129,8 +129,15 @@ const App: React.FC = () => {
     const prevUsersRef = useRef<User[]>([]);
     const prevSiniestrosRef = useRef<Siniestro[]>([]);
 
+    // =========================================================================
+    // LÓGICA DE RUTAS PÚBLICAS Y PARÁMETROS MEJORADA (A PRUEBA DE ERRORES)
+    // =========================================================================
     const urlParams = new URLSearchParams(window.location.search);
-    const publicRouteId = urlParams.get('publicRoute');
+    
+    // Limpiamos el ID por si el usuario lo copió con espacios, saltos de línea o barras al final
+    const rawPublicRouteId = urlParams.get('publicRoute');
+    const publicRouteId = rawPublicRouteId ? rawPublicRouteId.replace(/[^a-zA-Z0-9-]/g, '') : null;
+    
     const expireParam = urlParams.get('expire');
     const isDriverMode = urlParams.get('mode') === 'driver';
     const isSiniestroMode = urlParams.get('mode') === 'siniestro';
@@ -165,23 +172,15 @@ const App: React.FC = () => {
                     const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros'] };
                     setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
-
-                const offlineSiniestros = JSON.parse(localStorage.getItem('offline_siniestros') || '[]');
-                if (Array.isArray(offlineSiniestros) && offlineSiniestros.length > 0 && navigator.onLine) {
-                    for (const os of offlineSiniestros) { await saveSiniestroToDB(os).catch(()=>{}); }
-                    localStorage.removeItem('offline_siniestros');
-                }
-
             } catch (err) {
-                console.warn("Usando Modo Local.", err);
+                console.warn("Error cargando BD o sin conexión. Usando Caché Local.", err);
                 setRoutes(Array.isArray(JSON.parse(localStorage.getItem('routes') || '[]')) ? JSON.parse(localStorage.getItem('routes') || '[]') :[]);
                 setRisks(Array.isArray(JSON.parse(localStorage.getItem('risks') || '[]')) ? JSON.parse(localStorage.getItem('risks') || '[]') :[]);
                 setSiniestros(Array.isArray(JSON.parse(localStorage.getItem('siniestros') || '[]')) ? JSON.parse(localStorage.getItem('siniestros') || '[]') :[]);
                 const localTypes = JSON.parse(localStorage.getItem('riskTypes') || '[]'); if(Array.isArray(localTypes) && localTypes.length > 0) setRiskTypes(localTypes);
-                const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
-                if(Array.isArray(localUsers) && localUsers.length > 0) setUsers(localUsers);
-                else setUsers([{ id: uuidv4(), name: 'Admin Local', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros'] }]);
-            } finally { setIsLoadingData(false); }
+            } finally { 
+                setIsLoadingData(false); 
+            }
         };
         initData();
     },[]);
@@ -194,7 +193,7 @@ const App: React.FC = () => {
         const deleted = prev.filter(p => !routes.find(c => c.id === p.id));
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
         deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{}));
-        added.forEach(c => { saveRouteToDB(c).catch((e) => console.error("Error al subir a Firebase:", e)); });
+        added.forEach(c => { saveRouteToDB(c).catch((e) => console.error("Error al subir a BD:", e)); });
         prevRoutesRef.current = routes;
     },[routes, isLoadingData]);
 
@@ -458,6 +457,10 @@ const App: React.FC = () => {
         return baseVisibleRisks;
     },[baseVisibleRisks, activeTab, visibleRoutes, reportSelectedRouteId, riskViewerSelectedTypes]);
 
+    // =================================================================================
+    // NAVEGACIÓN PRINCIPAL
+    // =================================================================================
+
     if (isSiniestroMode) {
         return <SiniestroForm onSaveSiniestro={async (sin) => { 
             setSiniestros(prev =>[...prev, sin]); 
@@ -479,11 +482,41 @@ const App: React.FC = () => {
     }
 
     if (publicRouteId) {
-        if (expireParam && Date.now() > Number(expireParam)) return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col p-4 text-center"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Enlace Expirado</h1><p className="text-gray-400">Este enlace temporal ha caducado por seguridad.</p></div>;
-        if (isLoadingData) return <div className="flex h-screen bg-gray-900 items-center justify-center text-sky-400 font-bold animate-pulse">Cargando recorrido...</div>;
+        if (expireParam && Date.now() > Number(expireParam)) {
+            return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col p-4 text-center"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Enlace Expirado</h1><p className="text-gray-400">Este enlace temporal ha caducado por seguridad.</p></div>;
+        }
+        
+        if (isLoadingData) {
+            return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-sky-400 font-bold animate-pulse text-xl">Cargando mapa público...</div>;
+        }
+        
         const publicRoute = Array.isArray(routes) ? routes.find(r => r.id === publicRouteId) : null;
-        if (publicRoute && (publicRoute.isPublic || expireParam)) return <PublicRouteViewer route={publicRoute} risks={Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(publicRouteId)) :[]} riskTypes={riskTypes} groupColors={groupColors} />;
-        return <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col"><AlertCircle size={64} className="text-red-500 mb-4" /><h1 className="text-2xl font-bold mb-2 text-sky-400">Acceso Denegado</h1><p className="text-gray-400">El recorrido no existe o es privado.</p></div>;
+        
+        if (publicRoute && (publicRoute.isPublic || expireParam)) {
+            const safeRisks = Array.isArray(risks) ? risks.filter(risk => (Array.isArray(risk.associatedRouteIds) ? risk.associatedRouteIds :[]).includes(publicRouteId)) : [];
+            return <PublicRouteViewer route={publicRoute} risks={safeRisks} riskTypes={riskTypes} groupColors={groupColors} />;
+        }
+        
+        // Si llega aquí, es porque la URL falla. Explicamos detalladamente por qué para facilitar soporte.
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white flex-col p-6 text-center">
+                <AlertCircle size={64} className="text-red-500 mb-4" />
+                <h1 className="text-3xl font-bold mb-2 text-sky-400">Acceso Denegado</h1>
+                <p className="text-gray-400 max-w-md text-lg mb-6">El recorrido no existe, fue marcado como privado, o el enlace está incompleto.</p>
+                
+                {routes.length === 0 && (
+                    <div className="bg-red-900/30 border border-red-500 p-4 rounded-lg text-sm max-w-lg text-left text-red-200">
+                        <p className="font-bold text-base mb-2">⚠️ Diagnóstico para el Administrador:</p>
+                        La base de datos bloqueó la conexión pública (0 rutas obtenidas). Para que los links funcionen, ve al <b>SQL Editor</b> de Supabase y ejecuta:
+                        <code className="block bg-black p-3 mt-2 rounded text-green-400 select-all font-mono text-xs">
+                            ALTER TABLE routes DISABLE ROW LEVEL SECURITY;<br/>
+                            ALTER TABLE risks DISABLE ROW LEVEL SECURITY;<br/>
+                            ALTER TABLE risk_types DISABLE ROW LEVEL SECURITY;
+                        </code>
+                    </div>
+                )}
+            </div>
+        );
     }
 
     if (!currentUser && !isLoadingData) return <Login users={users} onLogin={handleLogin} isDriverMode={false} />;
