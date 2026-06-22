@@ -21,7 +21,7 @@ import {
     saveRiskTypeToDB, loadRiskTypesFromDB, deleteRiskTypeFromDB,
     saveUserToDB, loadUsersFromDB, deleteUserFromDB,
     saveSiniestroToDB, loadSiniestrosFromDB, deleteSiniestroFromDB
-} from './lib/firebase';
+} from './lib/supabase';
 
 const SAN_RAFAEL_CENTER: LatLngExpression =[-34.6175, -68.335];
 
