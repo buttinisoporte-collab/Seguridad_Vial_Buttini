@@ -14,13 +14,11 @@ console.log("Key de Supabase:", supabaseKey ? "Cargada OK" : "FALTA LA KEY");
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-export const loadExternalData = async () => {
-    // ⚠️ ATENCIÓN: Cambia los nombres 'conductores', 'unidades', 'servicios' 
-    // por los nombres reales de tus tablas en la BD externa.
+xport const loadExternalData = async () => {
     const [resConductores, resUnidades, resServicios] = await Promise.all([
         externalSupabase.from('conductores').select('*'),
         externalSupabase.from('unidades').select('*'),
-        externalSupabase.from('servicios').select('*')
+        externalSupabase.from('servicios').select('*').eq('activo', true) // <-- AQUÍ ESTÁ LA CLAVE
     ]);
 
     if (resConductores.error) console.error("Error conductores:", resConductores.error);
