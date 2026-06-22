@@ -282,8 +282,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                     </div>
                 </div>
 
-                {/* SECCION 2 */}
-                {/* SECCION 2 */}
+                  {/* SECCION 2 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">2. Conductor y Unidad</h2>
                     
@@ -346,7 +345,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                             <datalist id="lista-servicios">
                                 {/* ⚠️ Ajusta 's.linea' si en tu BD se llama diferente */}
                                 {externalLists.servicios.map(s => (
-                                    <option key={s.id} value={s.linea} />
+                                    <option key={s.id} value={s.nombre} />
                                 ))}
                             </datalist>
                         </div>

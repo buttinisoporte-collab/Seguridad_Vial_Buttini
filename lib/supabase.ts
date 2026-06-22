@@ -14,7 +14,7 @@ console.log("Key de Supabase:", supabaseKey ? "Cargada OK" : "FALTA LA KEY");
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-xport const loadExternalData = async () => {
+export const loadExternalData = async () => {
     const [resConductores, resUnidades, resServicios] = await Promise.all([
         externalSupabase.from('conductores').select('*'),
         externalSupabase.from('unidades').select('*'),
