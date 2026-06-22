@@ -48,38 +48,25 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
     });
 
     // Estado para guardar los datos de la BD externa
-    const [externalLists, setExternalLists] = useState({ 
-        conductores: [] as any[], 
-        unidades: [] as any[], 
-        servicios: [] as any[] 
-    });
+    const [externalLists, setExternalLists] = useState({ conductores: [] as any[], unidades: [] as any[], servicios: [] as any[] });
 
-    // Cargar los datos externos al abrir el formulario
-     useEffect(() => {
-        loadExternalData().then(data => {
-            // 1. Ordenar conductores alfabéticamente (A-Z)
-            const conductoresOrdenados = [...data.conductores].sort((a, b) => 
-                (a.nombre || '').localeCompare(b.nombre || '')
-            );
-
-            // 2. Ordenar servicios/líneas alfabéticamente (A-Z)
-            const serviciosOrdenados = [...data.servicios].sort((a, b) => 
-                (a.linea || '').localeCompare(b.linea || '')
-            );
-
-            // 3. Ordenar unidades numéricamente (ej: 1, 2, 10, 20)
-            const unidadesOrdenadas = [...data.unidades].sort((a, b) => 
-                (a.interno || '').localeCompare(b.interno || '', undefined, { numeric: true })
-            );
-
-            // Guardar en el estado ya ordenado
-            setExternalLists({
-                conductores: conductoresOrdenados,
-                servicios: serviciosOrdenados,
-                unidades: unidadesOrdenadas
-            });
-        });
+    // Cargar las 3 listas al abrir el formulario
+    useEffect(() => {
+        loadExternalData().then(data => setExternalLists(data));
     }, []);
+
+    // Función especial para cuando seleccionan un conductor (autocompleta el legajo)
+    const handleConductorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        // ⚠️ ATENCIÓN: Asegúrate de que 'nombre' y 'legajo' sean las columnas reales de tu BD
+        const conductor = externalLists.conductores.find(c => c.nombre === val);
+        
+        setF(prev => ({
+            ...prev,
+            condNombre: val,
+            condLegajo: conductor ? conductor.legajo : prev.condLegajo // Si lo encuentra, llena el legajo
+        }));
+    };
     
     useEffect(() => {
         if (initialSiniestro) {
@@ -296,36 +283,73 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 </div>
 
                 {/* SECCION 2 */}
+                {/* SECCION 2 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">2. Conductor y Unidad</h2>
+                    
                     <div className="space-y-3">
-                        
-                        {/* INPUT CONDUCTOR */}
+                        {/* INPUT CONDUCTOR CON AUTOCOMPLETAR */}
                         <div>
-                            <input type="text" list="lista-conductores" name="condNombre" value={f.condNombre} onChange={handleChange} placeholder="Conductor (Buscar...)" required className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" />
+                            <input 
+                                type="text" 
+                                list="lista-conductores" 
+                                name="condNombre" 
+                                value={f.condNombre} 
+                                onChange={handleConductorChange} 
+                                placeholder="Nombre y Apellido (Escriba para buscar...)" 
+                                required 
+                                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" 
+                            />
                             <datalist id="lista-conductores">
-                                {externalLists.conductores.map(c => <option key={`nom-${c.id}`} value={c.nombre} />)}
+                                {externalLists.conductores.map(c => (
+                                    <option key={c.id} value={c.nombre} />
+                                ))}
                             </datalist>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            {/* INPUT UNIDAD */}
+                            <input type="text" name="condLegajo" value={f.condLegajo} onChange={handleChange} placeholder="Legajo/DNI" required className="bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" />
+                            
+                            {/* INPUT UNIDAD CON AUTOCOMPLETAR */}
                             <div>
-                                <input type="text" list="lista-unidades" name="condInterno" value={f.condInterno} onChange={handleChange} placeholder="Interno N° (Buscar...)" required className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" />
+                                <input 
+                                    type="text" 
+                                    list="lista-unidades" 
+                                    name="condInterno" 
+                                    value={f.condInterno} 
+                                    onChange={handleChange} 
+                                    placeholder="Interno N°" 
+                                    required 
+                                    className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" 
+                                />
                                 <datalist id="lista-unidades">
-                                    {externalLists.unidades.map(u => <option key={`uni-${u.id}`} value={u.numero} />)}
-                                </datalist>
-                            </div>
-
-                            {/* INPUT LINEA */}
-                            <div>
-                                <input type="text" list="lista-servicios" name="condLinea" value={f.condLinea} onChange={handleChange} placeholder="Línea afectada (Buscar...)" required className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" />
-                                <datalist id="lista-servicios">
-                                    {externalLists.servicios.map(s => <option key={`srv-${s.id}`} value={s.nombre} />)}
+                                    {/* ⚠️ Ajusta 'c.interno' si en tu BD se llama diferente */}
+                                    {externalLists.unidades.map(u => (
+                                        <option key={u.id} value={u.numero} />
+                                    ))}
                                 </datalist>
                             </div>
                         </div>
 
+                        {/* INPUT SERVICIO/LINEA CON AUTOCOMPLETAR */}
+                        <div>
+                            <input 
+                                type="text" 
+                                list="lista-servicios" 
+                                name="condLinea" 
+                                value={f.condLinea} 
+                                onChange={handleChange} 
+                                placeholder="Línea afectada" 
+                                required 
+                                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" 
+                            />
+                            <datalist id="lista-servicios">
+                                {/* ⚠️ Ajusta 's.linea' si en tu BD se llama diferente */}
+                                {externalLists.servicios.map(s => (
+                                    <option key={s.id} value={s.linea} />
+                                ))}
+                            </datalist>
+                        </div>
                     </div>
                 </div>
 
