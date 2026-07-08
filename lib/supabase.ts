@@ -164,21 +164,41 @@ export const deleteUserFromDB = async (id: string) => { await supabase.from('use
 // ==========================================================
 export const saveSiniestroToDB = async (sin: Siniestro) => {
     await supabase.from('siniestros').upsert({
-        id: sin.id, timestamp: sin.timestamp, fecha_hora: sin.fechaHora,
-        ubicacion: sin.ubicacion, conductor: sin.conductor, descripcion: sin.descripcion,
-        entorno: sin.entorno, datos_complementarios: sin.datosComplementarios,
-        images: sin.images, drive_url: sin.driveUrl, associated_route_id: sin.associatedRouteId
+        id: sin.id, 
+        tipo_evento: sin.tipoEvento || 'Siniestro',
+        timestamp: sin.timestamp, 
+        fecha_hora: sin.fechaHora,
+        ubicacion: sin.ubicacion, 
+        conductor: sin.conductor, 
+        descripcion: sin.descripcion,
+        entorno: sin.entorno, 
+        datos_complementarios: sin.datosComplementarios,
+        images: sin.images, 
+        drive_url: sin.driveUrl, 
+        associated_route_id: sin.associatedRouteId,
+        investigacion: sin.investigacion
     });
 };
 
 export const loadSiniestrosFromDB = async (): Promise<Siniestro[]> => {
     const { data } = await supabase.from('siniestros').select('*');
     return (data || []).map(s => ({
-        id: s.id, timestamp: s.timestamp, fechaHora: s.fecha_hora,
-        ubicacion: s.ubicacion, conductor: s.conductor, descripcion: s.descripcion,
-        entorno: s.entorno, datosComplementarios: s.datos_complementarios,
-        images: s.images, driveUrl: s.drive_url, associatedRouteId: s.associated_route_id
+        id: s.id, 
+        tipoEvento: s.tipo_evento || 'Siniestro',
+        timestamp: s.timestamp, 
+        fechaHora: s.fecha_hora,
+        ubicacion: s.ubicacion, 
+        conductor: s.conductor, 
+        descripcion: s.descripcion,
+        entorno: s.entorno, 
+        datosComplementarios: s.datos_complementarios,
+        images: s.images, 
+        driveUrl: s.drive_url, 
+        associatedRouteId: s.associated_route_id,
+        investigacion: s.investigacion 
     })) as Siniestro[];
 };
 
-export const deleteSiniestroFromDB = async (id: string) => { await supabase.from('siniestros').delete().eq('id', id); };
+export const deleteSiniestroFromDB = async (id: string) => { 
+    await supabase.from('siniestros').delete().eq('id', id); 
+};

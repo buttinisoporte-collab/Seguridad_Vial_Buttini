@@ -19,8 +19,39 @@ export interface Risk {
 
 export interface Consecuencia { tipo: string; activa: boolean; cantidad: string; }
 
+export interface VictimaDetalle {
+    id: string;
+    nombre: string;
+    dni: string;
+}
+
+export interface InvestigacionData {
+    zona?: string;
+    numeroSiniestro?: string;
+    grupo?: string;
+    tipoServicio?: string;
+    dominio?: string;
+    sectorDanado?: string;
+    accionCorrectiva?: string;
+    presentoReclamo?: string;
+    ampliacionDeclaracion?: string;
+    ampliacionLugar?: string;
+    estadoAmd?: string;
+    estadoJudicial?: string;
+    responsabilidadFinal?: string;
+    responsabilidadCsv?: string;
+    franquicia?: string;
+    seguroTercero?: string;
+    ofrecimiento?: string;
+    pretension?: string;
+    estadoReclamo?: string;
+    abonado?: string;
+    linkVideoCamara?: string;
+    victimasDetalle?: VictimaDetalle[];
+}
+
 export interface Siniestro {
-    id: string; timestamp: number; fechaHora: string;
+    id: string; tipoEvento?: 'Siniestro' | 'Incidente'; timestamp: number; fechaHora: string; investigacion?: InvestigacionData;
     ubicacion: { lat?: number; lng?: number; manual: string; lugar: string; };
     conductor: { nombre: string; legajo: string; interno: string; kilometraje: string; linea: string; };
     descripcion: { tipo: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; gravedad: string; };

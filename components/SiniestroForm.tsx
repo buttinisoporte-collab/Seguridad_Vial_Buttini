@@ -37,6 +37,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
     const[selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
     const[f, setF] = useState({
+        tipoEvento: (initialSiniestro?.tipoEvento || 'Siniestro') as 'Siniestro' | 'Incidente',
         fechaHora: new Date().toISOString().slice(0,16), ubicacionManual: '', lugar: 'Ciudad',
         climas: [] as string[], caminos:[] as string[], visibilidades: [] as string[],
         condNombre: '', condLegajo: '', condInterno: '', condKm: '', condLinea: '',
@@ -164,7 +165,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
             const newSiniestro: Siniestro = {
                 ...initialSiniestro, // Retain other missing properties if any
-                id: siniestroId, timestamp: initialSiniestro?.timestamp || Date.now(), fechaHora: f.fechaHora,
+                id: siniestroId, tipoEvento: f.tipoEvento, timestamp: initialSiniestro?.timestamp || Date.now(), fechaHora: f.fechaHora,
                 ubicacion: { lat: gpsPosition?.lat, lng: gpsPosition?.lng, manual: f.ubicacionManual, lugar: f.lugar },
                 conductor: { nombre: f.condNombre, legajo: f.condLegajo, interno: f.condInterno, kilometraje: f.condKm, linea: f.condLinea },
                 descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores, gravedad: f.gravedad },
@@ -215,6 +216,20 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 {/* SECCION 1 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">1. Información General</h2>
+                    
+                    <div className="flex gap-3 mb-4">
+                        <label className={`flex-1 p-3 rounded-lg border text-center font-bold cursor-pointer transition-all ${f.tipoEvento === 'Siniestro' ? 'bg-red-900/50 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'}`}>
+                            <input type="radio" name="tipoEvento" value="Siniestro" checked={f.tipoEvento === 'Siniestro'} onChange={handleChange} className="hidden" />
+                            🚨 Es un Siniestro
+                        </label>
+                        <label className={`flex-1 p-3 rounded-lg border text-center font-bold cursor-pointer transition-all ${f.tipoEvento === 'Incidente' ? 'bg-yellow-900/50 border-yellow-500 text-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.2)]' : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'}`}>
+                            <input type="radio" name="tipoEvento" value="Incidente" checked={f.tipoEvento === 'Incidente'} onChange={handleChange} className="hidden" />
+                            ⚠️ Es un Incidente
+                        </label>
+                    </div>
+
+                    <div className="space-y-3"></div>
+                    
                     <div className="space-y-3">
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase">Fecha y Hora</span><input type="datetime-local" name="fechaHora" value={f.fechaHora} onChange={handleChange} required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none" /></label>
                         
