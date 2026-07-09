@@ -202,3 +202,36 @@ export const loadSiniestrosFromDB = async (): Promise<Siniestro[]> => {
 export const deleteSiniestroFromDB = async (id: string) => { 
     await supabase.from('siniestros').delete().eq('id', id); 
 };
+
+// ==========================================================
+// METRICAS MENSULAES (INDICADORES)
+// ==========================================================
+import type { MetricasMensuales } from '../types';
+
+export const saveMetricasToDB = async (metricas: MetricasMensuales) => {
+    await supabase.from('metricas_mensuales').upsert({
+        id: metricas.id,
+        nomina_activa: metricas.nominaActiva,
+        flota_activa: metricas.flotaActiva,
+        kms_urbano_540: metricas.kmsUrbano540,
+        kms_urbano_570: metricas.kmsUrbano570,
+        kms_media_540: metricas.kmsMedia540,
+        kms_media_570: metricas.kmsMedia570,
+        kms_larga_570: metricas.kmsLarga570
+    });
+};
+
+export const loadMetricasFromDB = async (id: string): Promise<MetricasMensuales | null> => {
+    const { data, error } = await supabase.from('metricas_mensuales').select('*').eq('id', id).single();
+    if (error || !data) return null;
+    return {
+        id: data.id,
+        nominaActiva: data.nomina_activa,
+        flotaActiva: data.flota_activa,
+        kmsUrbano540: data.kms_urbano_540,
+        kmsUrbano570: data.kms_urbano_570,
+        kmsMedia540: data.kms_media_540,
+        kmsMedia570: data.kms_media_570,
+        kmsLarga570: data.kms_larga_570
+    };
+};

@@ -86,6 +86,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
             }
 
             setF({
+                tipoEvento: initialSiniestro.tipoEvento || 'Siniestro',
                 fechaHora: initialSiniestro.fechaHora ? new Date(initialSiniestro.fechaHora).toISOString().slice(0,16) : new Date(initialSiniestro.timestamp).toISOString().slice(0,16),
                 ubicacionManual: initialSiniestro.ubicacion.manual || '',
                 lugar: initialSiniestro.ubicacion.lugar || 'Ciudad',

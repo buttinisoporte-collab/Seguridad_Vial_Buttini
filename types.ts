@@ -1,4 +1,4 @@
-export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'novedades' | 'siniestros' | 'settings' | 'users';
+export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'settings' | 'users' | 'novedades' | 'siniestros' | 'seguimiento' | 'indicadores';
 
 export interface Position { lat: number; lng: number; }
 export interface RiskType { id: string; name: string; color: string; isIncident: boolean; }
@@ -23,6 +23,17 @@ export interface VictimaDetalle {
     id: string;
     nombre: string;
     dni: string;
+}
+
+export interface MetricasMensuales {
+    id: string; // "YYYY-MM"
+    nominaActiva: number;
+    flotaActiva: number;
+    kmsUrbano540: number;
+    kmsUrbano570: number;
+    kmsMedia540: number;
+    kmsMedia570: number;
+    kmsLarga570: number;
 }
 
 export interface InvestigacionData {
