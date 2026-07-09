@@ -7,7 +7,7 @@ import { RiskViewer } from './RiskViewer';
 import { NovedadesList } from './NovedadesList';
 import { SiniestrosAdmin } from './SiniestrosAdmin';
 import { SeguimientoAdmin } from './SeguimientoAdmin';
-import { IndicadoresAdmin } from './IndicadoresAdmin'; // <--- AGREGAR ESTA LÍNEA
+import { IndicadoresAdmin } from './IndicadoresAdmin';
 import { Settings } from './Settings';
 import { UserManager } from './UserManager';
 import { MapPin, AlertTriangle, FileBarChart, Layers, Settings as SettingsIcon, Users, LogOut, Key, List, ShieldAlert, FileSpreadsheet, PieChart as PieChartIcon } from 'lucide-react';
@@ -114,6 +114,8 @@ export const Panel: React.FC<PanelProps> = ({
         }
     };
 
+    const isFullScreenTab = activeTab === 'seguimiento' || activeTab === 'indicadores';
+
     return (
         <div className="flex flex-col h-screen w-screen bg-slate-100 font-sans overflow-hidden">
             <header className="h-[72px] bg-[#0b0f19] text-white flex items-center justify-between shadow-md z-20 flex-shrink-0">
@@ -162,10 +164,10 @@ export const Panel: React.FC<PanelProps> = ({
             </header>
 
             <div className="flex flex-1 overflow-hidden min-h-0 relative">
-                {/* SIDEBAR NORMAL (Se oculta cuando estamos en Seguimiento CRM) */}
-                <aside className={`bg-[#111827] text-white shadow-[4px_0_24px_rgba(0,0,0,0.4)] z-10 flex flex-col flex-shrink-0 border-r border-slate-800 transition-all duration-300 ease-in-out ${activeTab === 'seguimiento' ? 'hidden' : 'w-[380px]'}`}>
+                {/* SIDEBAR NORMAL (Se oculta cuando estamos en Seguimiento CRM o Indicadores) */}
+                <aside className={`bg-[#111827] text-white shadow-[4px_0_24px_rgba(0,0,0,0.4)] z-10 flex flex-col flex-shrink-0 border-r border-slate-800 transition-all duration-300 ease-in-out ${isFullScreenTab ? 'hidden' : 'w-[380px]'}`}>
                     <div className="flex-1 p-5 overflow-y-auto custom-scrollbar">
-                        {activeTab !== 'seguimiento' && renderTabContent()}
+                        {!isFullScreenTab && renderTabContent()}
                     </div>
                 </aside>
                 
@@ -173,12 +175,12 @@ export const Panel: React.FC<PanelProps> = ({
                 <main className="flex-1 relative z-0 bg-slate-200 overflow-hidden">
                     {/* El mapa DEBE permanecer siempre montado en el DOM para que la librería Leaflet no se rompa ni pierda sus dimensiones.
                         Por eso usamos opacity-0 y pointer-events-none en lugar de ocultarlo completamente o quitarlo de la vista. */}
-                    <div className={`w-full h-full absolute inset-0 ${activeTab === 'seguimiento' ? 'opacity-0 pointer-events-none z-0' : 'z-10'}`}>
+                    <div className={`w-full h-full absolute inset-0 ${isFullScreenTab ? 'opacity-0 pointer-events-none z-0' : 'z-10'}`}>
                         {children}
                     </div>
 
-                    {/* Cuando entramos a Seguimiento, montamos la pantalla a FULL WIDTH sobre fondo negro */}
-                    {activeTab === 'seguimiento' && (
+                    {/* Cuando entramos a Seguimiento o Indicadores, montamos la pantalla a FULL WIDTH sobre fondo negro */}
+                    {isFullScreenTab && (
                         <div className="absolute inset-0 z-50 bg-black flex w-full h-full">
                             {renderTabContent()}
                         </div>
