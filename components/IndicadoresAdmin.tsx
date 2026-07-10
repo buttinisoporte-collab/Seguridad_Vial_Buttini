@@ -23,7 +23,6 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
     const [metricasAnuales, setMetricasAnuales] = useState<MetricasMensuales[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Cargar datos para el formulario (Mes Específico)
     useEffect(() => {
         const fetchMetricasForm = async () => {
             const data = await loadMetricasFromDB(mesFormulario);
@@ -33,7 +32,6 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
         fetchMetricasForm();
     }, [mesFormulario]);
 
-    // Cargar TODAS las métricas del año para armar los gráficos
     useEffect(() => {
         const fetchMetricasAnuales = async () => {
             const data = await loadMetricasAnualesFromDB(yearSeleccionado);
@@ -43,7 +41,6 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
     }, [yearSeleccionado, isSaving]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Se cambió a parseFloat y se admite cualquier valor
         let val = parseFloat(e.target.value);
         if (isNaN(val)) val = 0;
         setMetricasForm(prev => ({ ...prev, [e.target.name]: val }));
@@ -56,12 +53,10 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
         setIsSaving(false);
     };
 
-    // Filtramos todos los eventos del año seleccionado
     const eventosAño = useMemo(() => {
         return siniestros.filter(s => (s.fechaHora || s.timestamp).toString().startsWith(yearSeleccionado));
     }, [siniestros, yearSeleccionado]);
 
-    // Función segura de división (Multiplicada por 10.000 o 100 según corresponda)
     const calc = (num: number, den: number, multiplier: number = 1) => den > 0 ? Number(((num / den) * multiplier).toFixed(3)) : 0;
 
     // =======================================================
@@ -182,23 +177,30 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
     }, [eventosAño]);
 
 
+    // =======================================================
     // COMPONENTES DE GRÁFICO REUTILIZABLES
+    // =======================================================
+    
+    // Gráfico de Siniestros (Combinado: Barras y Línea de Objetivo)
     const ChartCard = ({ title, dataKeyBar, dataKeyObj, color, format }: { title: string, dataKeyBar: string, dataKeyObj: string, color: string, format: string }) => (
-        <div className="bg-white p-6 rounded-xl border border-gray-300 shadow-md h-[400px] mb-8">
-            <h4 className="text-sm font-bold text-gray-800 text-center mb-6">{title}</h4>
-            <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={dataAnualSiniestros} margin={{ top: 30, right: 20, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" fontSize={11} tick={{ fill: '#4b5563' }} />
-                    <YAxis fontSize={11} tickFormatter={(tick) => `${tick}${format}`} />
-                    <ChartTooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                    <Bar dataKey={dataKeyBar} name="INDICADOR" fill={color} barSize={40} radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey={dataKeyBar} position="top" fill={color} fontSize={12} formatter={(v:any) => v > 0 ? `${v}${format}` : ''} />
-                    </Bar>
-                    <Line type="step" dataKey={dataKeyObj} name="OBJETIVO" stroke="#f97316" strokeWidth={2} dot={false} activeDot={false} />
-                </ComposedChart>
-            </ResponsiveContainer>
+        <div className="bg-white p-4 rounded-xl border border-gray-300 shadow-md h-[300px] flex flex-col">
+            <h4 className="text-xs font-bold text-gray-800 text-center mb-2">{title}</h4>
+            <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={dataAnualSiniestros} margin={{ top: 20, right: 10, left: -20, bottom: 25 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        {/* height={45} y angle={-45} evitan que los nombres de los meses se corten */}
+                        <XAxis dataKey="name" fontSize={10} tick={{ fill: '#4b5563' }} angle={-45} textAnchor="end" height={45} />
+                        <YAxis fontSize={10} tickFormatter={(tick) => `${tick}${format}`} />
+                        <ChartTooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '12px' }} />
+                        <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '0px' }} />
+                        <Bar dataKey={dataKeyBar} name="INDICADOR" fill={color} barSize={25} radius={[2, 2, 0, 0]}>
+                            <LabelList dataKey={dataKeyBar} position="top" fill={color} fontSize={10} formatter={(v:any) => v > 0 ? `${v}${format}` : ''} />
+                        </Bar>
+                        <Line type="step" dataKey={dataKeyObj} name="OBJETIVO" stroke="#f97316" strokeWidth={2} dot={false} activeDot={false} />
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
         </div>
     );
 
@@ -224,144 +226,153 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                         <input type="month" value={mesFormulario} onChange={(e) => setMesFormulario(e.target.value)} className="bg-gray-100 border border-gray-300 rounded p-2 text-sm font-bold outline-none focus:border-sky-500 cursor-pointer" />
                     </div>
                     
-                    {/* SE AGREGÓ step="any" A TODOS LOS INPUTS TYPE="number" */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Nómina Activa</label><input type="number" step="any" name="nominaActiva" value={metricasForm.nominaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Conductores (%)</label><input type="number" step="any" name="objConductores" value={metricasForm.objConductores} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Flota Activa</label><input type="number" step="any" name="flotaActiva" value={metricasForm.flotaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Unidades (%)</label><input type="number" step="any" name="objUnidades" value={metricasForm.objUnidades} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Nómina Activa</label><input type="number" step="any" name="nominaActiva" value={metricasForm.nominaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Conductores (%)</label><input type="number" step="any" name="objConductores" value={metricasForm.objConductores} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Flota Activa</label><input type="number" step="any" name="flotaActiva" value={metricasForm.flotaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Unidades (%)</label><input type="number" step="any" name="objUnidades" value={metricasForm.objUnidades} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                        <div className="md:col-span-2 border-t pt-4"><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Kms Totales (Índice 10k)</label><input type="number" step="any" name="objKmsTotales" value={metricasForm.objKmsTotales} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="md:col-span-2 border-t pt-3"><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Kms Totales (Índice 10k)</label><input type="number" step="any" name="objKmsTotales" value={metricasForm.objKmsTotales} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 border-t pt-4">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G540)</label><input type="number" step="any" name="kmsUrbano540" value={metricasForm.kmsUrbano540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G540</label><input type="number" step="any" name="objKmsUrbano540" value={metricasForm.objKmsUrbano540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G570)</label><input type="number" step="any" name="kmsUrbano570" value={metricasForm.kmsUrbano570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G570</label><input type="number" step="any" name="objKmsUrbano570" value={metricasForm.objKmsUrbano570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 border-t pt-3">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G540)</label><input type="number" step="any" name="kmsUrbano540" value={metricasForm.kmsUrbano540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G540</label><input type="number" step="any" name="objKmsUrbano540" value={metricasForm.objKmsUrbano540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G570)</label><input type="number" step="any" name="kmsUrbano570" value={metricasForm.kmsUrbano570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G570</label><input type="number" step="any" name="objKmsUrbano570" value={metricasForm.objKmsUrbano570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G540)</label><input type="number" step="any" name="kmsMedia540" value={metricasForm.kmsMedia540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G540</label><input type="number" step="any" name="objKmsMedia540" value={metricasForm.objKmsMedia540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G570)</label><input type="number" step="any" name="kmsMedia570" value={metricasForm.kmsMedia570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G570</label><input type="number" step="any" name="objKmsMedia570" value={metricasForm.objKmsMedia570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G540)</label><input type="number" step="any" name="kmsMedia540" value={metricasForm.kmsMedia540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G540</label><input type="number" step="any" name="objKmsMedia540" value={metricasForm.objKmsMedia540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G570)</label><input type="number" step="any" name="kmsMedia570" value={metricasForm.kmsMedia570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G570</label><input type="number" step="any" name="objKmsMedia570" value={metricasForm.objKmsMedia570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Larga Dist. (G570)</label><input type="number" step="any" name="kmsLarga570" value={metricasForm.kmsLarga570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Larga G570</label><input type="number" step="any" name="objKmsLarga570" value={metricasForm.objKmsLarga570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G540</label><input type="number" step="any" name="objKms540" value={metricasForm.objKms540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G570</label><input type="number" step="any" name="objKms570" value={metricasForm.objKms570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Larga Dist. (G570)</label><input type="number" step="any" name="kmsLarga570" value={metricasForm.kmsLarga570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-1.5 outline-none text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Larga G570</label><input type="number" step="any" name="objKmsLarga570" value={metricasForm.objKmsLarga570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G540</label><input type="number" step="any" name="objKms540" value={metricasForm.objKms540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G570</label><input type="number" step="any" name="objKms570" value={metricasForm.objKms570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-1.5 outline-none text-orange-700 font-bold text-sm" /></div>
                     </div>
 
-                    <button onClick={handleSave} disabled={isSaving} className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-8 rounded-lg flex items-center gap-2 transition-colors w-full md:w-auto justify-center">
-                        <Save size={18}/> Guardar Configuración de {mesFormulario}
+                    <button onClick={handleSave} disabled={isSaving} className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 px-8 rounded-lg flex items-center gap-2 transition-colors w-full md:w-auto justify-center text-sm">
+                        <Save size={16}/> Guardar Configuración de {mesFormulario}
                     </button>
                 </div>
 
 
-                {/* 2. GRÁFICOS ANUALES DE SINIESTROS (1 POR FILA) */}
-                <h3 className="text-2xl font-bold text-gray-800 text-center mt-12 uppercase tracking-widest border-b-4 border-red-500 pb-2 inline-block mx-auto">SINIESTROS {yearSeleccionado}</h3>
+                {/* 2. GRÁFICOS ANUALES DE SINIESTROS (2 POR FILA) */}
+                <h3 className="text-2xl font-bold text-gray-800 text-center mt-10 uppercase tracking-widest border-b-4 border-red-500 pb-2 inline-block mx-auto">SINIESTROS {yearSeleccionado}</h3>
                 
-                <ChartCard title="Siniestros por Cantidad de Unidades (%)" dataKeyBar="indUnidades" dataKeyObj="objUnidades" color="#0000ff" format="%" />
-                <ChartCard title="Siniestros por Cantidad de Conductores (%)" dataKeyBar="indConductores" dataKeyObj="objConductores" color="#ff0000" format="%" />
-                <ChartCard title="Total Siniestros por C/10.000 Kms Totales" dataKeyBar="indKmsTot" dataKeyObj="objKmsTot" color="#00ff00" format="" />
-                <ChartCard title="Total Siniestros por C/10.000 Kms G540" dataKeyBar="indKms540" dataKeyObj="objKms540" color="#00ff00" format="" />
-                <ChartCard title="Total Siniestros por C/10.000 Kms G570" dataKeyBar="indKms570" dataKeyObj="objKms570" color="#0000ff" format="" />
-                <ChartCard title="Siniestros por C/10.000 Kms URBANO G540" dataKeyBar="indKmsUrb540" dataKeyObj="objKmsUrb540" color="#0000ff" format="" />
-                <ChartCard title="Siniestros por C/10.000 Kms URBANO G570" dataKeyBar="indKmsUrb570" dataKeyObj="objKmsUrb570" color="#ff0000" format="" />
-                <ChartCard title="Siniestros por C/10.000 Kms Media Distancia G540" dataKeyBar="indKmsMed540" dataKeyObj="objKmsMed540" color="#0000ff" format="" />
-                <ChartCard title="Siniestros por C/10.000 Kms Media Distancia G570" dataKeyBar="indKmsMed570" dataKeyObj="objKmsMed570" color="#00ff00" format="" />
-                <ChartCard title="Siniestros por C/10.000 Kms Larga Distancia G570" dataKeyBar="indKmsLarga570" dataKeyObj="objKmsLarga570" color="#0000ff" format="" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ChartCard title="Siniestros por Cantidad de Unidades (%)" dataKeyBar="indUnidades" dataKeyObj="objUnidades" color="#0000ff" format="%" />
+                    <ChartCard title="Siniestros por Cantidad de Conductores (%)" dataKeyBar="indConductores" dataKeyObj="objConductores" color="#ff0000" format="%" />
+                    <ChartCard title="Total Siniestros por C/10.000 Kms Totales" dataKeyBar="indKmsTot" dataKeyObj="objKmsTot" color="#00ff00" format="" />
+                    <ChartCard title="Total Siniestros por C/10.000 Kms G540" dataKeyBar="indKms540" dataKeyObj="objKms540" color="#00ff00" format="" />
+                    <ChartCard title="Total Siniestros por C/10.000 Kms G570" dataKeyBar="indKms570" dataKeyObj="objKms570" color="#0000ff" format="" />
+                    <ChartCard title="Siniestros por C/10.000 Kms URBANO G540" dataKeyBar="indKmsUrb540" dataKeyObj="objKmsUrb540" color="#0000ff" format="" />
+                    <ChartCard title="Siniestros por C/10.000 Kms URBANO G570" dataKeyBar="indKmsUrb570" dataKeyObj="objKmsUrb570" color="#ff0000" format="" />
+                    <ChartCard title="Siniestros por C/10.000 Kms Media Distancia G540" dataKeyBar="indKmsMed540" dataKeyObj="objKmsMed540" color="#0000ff" format="" />
+                    <ChartCard title="Siniestros por C/10.000 Kms Media Distancia G570" dataKeyBar="indKmsMed570" dataKeyObj="objKmsMed570" color="#00ff00" format="" />
+                    <ChartCard title="Siniestros por C/10.000 Kms Larga Distancia G570" dataKeyBar="indKmsLarga570" dataKeyObj="objKmsLarga570" color="#0000ff" format="" />
+                </div>
 
 
-                {/* 3. GRÁFICOS DE INCIDENTES Y LESIONADOS */}
-                <h3 className="text-2xl font-bold text-gray-800 text-center mt-16 uppercase tracking-widest border-b-4 border-yellow-500 pb-2 inline-block mx-auto">INCIDENTES Y LESIONADOS {yearSeleccionado}</h3>
+                {/* 3. GRÁFICOS DE INCIDENTES Y LESIONADOS (MÁS BAJITOS: h-[280px]) */}
+                <h3 className="text-2xl font-bold text-gray-800 text-center mt-12 uppercase tracking-widest border-b-4 border-yellow-500 pb-2 inline-block mx-auto">INCIDENTES Y LESIONADOS {yearSeleccionado}</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     {/* INCIDENTES POR LÍNEA */}
-                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
-                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Cantidad de Incidentes por Línea</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataIncidentesLinea} margin={{ top: 30, right: 5, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" fontSize={11} />
-                                <YAxis fontSize={11} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
-                                <Bar dataKey="Indicador" fill="#eab308" radius={[4, 4, 0, 0]}>
-                                    <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={11} formatter={(v:any) => v > 0 ? v : ''} />
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col">
+                        <h4 className="text-xs font-bold text-gray-800 text-center mb-2 uppercase">Cantidad de Incidentes por Línea</h4>
+                        <div className="flex-1 min-h-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={dataIncidentesLinea} margin={{ top: 20, right: 5, left: -20, bottom: 45 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" fontSize={10} tick={{ fill: '#4b5563' }} angle={-45} textAnchor="end" height={50} />
+                                    <YAxis fontSize={10} />
+                                    <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                                    <Bar dataKey="Indicador" fill="#eab308" radius={[2, 2, 0, 0]}>
+                                        <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={10} formatter={(v:any) => v > 0 ? v : ''} />
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
 
                     {/* LESIONADOS POR MES */}
-                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
-                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Cantidad de Lesionados por Mes</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataLesionadosMes} margin={{ top: 30, right: 5, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" fontSize={11} />
-                                <YAxis fontSize={11} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
-                                <Bar dataKey="Indicador" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                                    <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={11} formatter={(v:any) => v > 0 ? v : ''} />
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col">
+                        <h4 className="text-xs font-bold text-gray-800 text-center mb-2 uppercase">Cantidad de Lesionados por Mes</h4>
+                        <div className="flex-1 min-h-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={dataLesionadosMes} margin={{ top: 20, right: 5, left: -20, bottom: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" fontSize={10} tick={{ fill: '#4b5563' }} />
+                                    <YAxis fontSize={10} />
+                                    <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                                    <Bar dataKey="Indicador" fill="#8b5cf6" radius={[2, 2, 0, 0]}>
+                                        <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={10} formatter={(v:any) => v > 0 ? v : ''} />
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     {/* LESIONADOS POR CONDUCTOR */}
-                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
-                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Lesionados por Conductor (Top 15)</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataLesionadosConductor} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                <XAxis type="number" fontSize={11} />
-                                <YAxis dataKey="name" type="category" width={100} fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
-                                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                                <Bar dataKey="Leves" stackId="a" fill="#10b981" />
-                                <Bar dataKey="Graves" stackId="a" fill="#f59e0b" />
-                                <Bar dataKey="Fallecidos" stackId="a" fill="#ef4444" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col">
+                        <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase">Lesionados por Conductor (Top 15)</h4>
+                        <div className="flex-1 min-h-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={dataLesionadosConductor} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" fontSize={10} />
+                                    <YAxis dataKey="name" type="category" width={140} fontSize={9} tickFormatter={(v) => v.length > 22 ? v.substring(0,20)+'...' : v} />
+                                    <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                                    <Bar dataKey="Leves" stackId="a" fill="#10b981" />
+                                    <Bar dataKey="Graves" stackId="a" fill="#f59e0b" />
+                                    <Bar dataKey="Fallecidos" stackId="a" fill="#ef4444" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
 
                     {/* LESIONADOS POR RECORRIDO */}
-                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
-                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Lesionados por Recorrido (Top 15)</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataLesionadosRecorrido} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                <XAxis type="number" fontSize={11} />
-                                <YAxis dataKey="name" type="category" width={100} fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
-                                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                                <Bar dataKey="Leves" stackId="a" fill="#10b981" />
-                                <Bar dataKey="Graves" stackId="a" fill="#f59e0b" />
-                                <Bar dataKey="Fallecidos" stackId="a" fill="#ef4444" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col">
+                        <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase">Lesionados por Recorrido (Top 15)</h4>
+                        <div className="flex-1 min-h-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={dataLesionadosRecorrido} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" fontSize={10} />
+                                    <YAxis dataKey="name" type="category" width={140} fontSize={9} tickFormatter={(v) => v.length > 22 ? v.substring(0,20)+'...' : v} />
+                                    <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                                    <Bar dataKey="Leves" stackId="a" fill="#10b981" />
+                                    <Bar dataKey="Graves" stackId="a" fill="#f59e0b" />
+                                    <Bar dataKey="Fallecidos" stackId="a" fill="#ef4444" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
 
                 {/* LESIONADOS POR GRUPO (TORTA) */}
-                <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md flex flex-col items-center">
-                    <h4 className="text-sm font-bold text-gray-800 text-center mb-2 uppercase w-full">Cantidad de Lesionados x Grupo</h4>
+                <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col items-center">
+                    <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase w-full">Cantidad de Lesionados x Grupo</h4>
                     {dataLesionadosGrupo.length === 0 ? (
                         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">No hay lesionados registrados este año.</div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                                <Pie data={dataLesionadosGrupo} cx="50%" cy="50%" labelLine={true} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(2)}%)`} outerRadius={120} fill="#8884d8" dataKey="value">
+                                <Pie data={dataLesionadosGrupo} cx="50%" cy="50%" labelLine={true} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`} outerRadius={90} fill="#8884d8" dataKey="value" style={{fontSize: '11px'}}>
                                     {dataLesionadosGrupo.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                 </Pie>
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
+                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
                             </PieChart>
                         </ResponsiveContainer>
                     )}
