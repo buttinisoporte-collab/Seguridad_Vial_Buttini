@@ -1,106 +1,110 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { loadMetricasFromDB, saveMetricasToDB } from '../lib/supabase';
+import { loadMetricasFromDB, saveMetricasToDB, loadMetricasAnualesFromDB } from '../lib/supabase';
 import type { Siniestro, MetricasMensuales } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { Activity, AlertCircle, Save, X } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, ComposedChart, Line, LabelList } from 'recharts';
+import { Activity, Save } from 'lucide-react';
 
 interface IndicadoresAdminProps {
     siniestros: Siniestro[];
 }
 
 const DEFAULT_METRICAS: MetricasMensuales = {
-    id: '', nominaActiva: 0, flotaActiva: 0, kmsUrbano540: 0, kmsUrbano570: 0, kmsMedia540: 0, kmsMedia570: 0, kmsLarga570: 0
+    id: '', nominaActiva: 0, flotaActiva: 0, kmsUrbano540: 0, kmsUrbano570: 0, kmsMedia540: 0, kmsMedia570: 0, kmsLarga570: 0,
+    objUnidades: 0, objConductores: 0, objKmsTotales: 0, objKms540: 0, objKmsUrbano540: 0, objKmsMedia540: 0, objKms570: 0, objKmsUrbano570: 0, objKmsMedia570: 0, objKmsLarga570: 0
 };
 
 const COLORS = ['#0284c7', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
+const MESES_NOMBRES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }) => {
-    const [mesSeleccionado, setMesSeleccionado] = useState<string>(new Date().toISOString().slice(0, 7)); // "YYYY-MM"
-    const [metricas, setMetricas] = useState<MetricasMensuales>({ ...DEFAULT_METRICAS, id: mesSeleccionado });
+    const [yearSeleccionado, setYearSeleccionado] = useState<string>(new Date().getFullYear().toString());
+    const [mesFormulario, setMesFormulario] = useState<string>(new Date().toISOString().slice(0, 7)); // "YYYY-MM"
+    const [metricasForm, setMetricasForm] = useState<MetricasMensuales>({ ...DEFAULT_METRICAS, id: mesFormulario });
+    const [metricasAnuales, setMetricasAnuales] = useState<MetricasMensuales[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [showMissingModal, setShowMissingModal] = useState(false);
 
+    // Cargar datos para el formulario (Mes Específico)
     useEffect(() => {
-        const fetchMetricas = async () => {
-            const data = await loadMetricasFromDB(mesSeleccionado);
-            if (data) setMetricas(data);
-            else setMetricas({ ...DEFAULT_METRICAS, id: mesSeleccionado });
+        const fetchMetricasForm = async () => {
+            const data = await loadMetricasFromDB(mesFormulario);
+            if (data) setMetricasForm(data);
+            else setMetricasForm({ ...DEFAULT_METRICAS, id: mesFormulario });
         };
-        fetchMetricas();
-    }, [mesSeleccionado]);
+        fetchMetricasForm();
+    }, [mesFormulario]);
+
+    // Cargar TODAS las métricas del año para armar los gráficos
+    useEffect(() => {
+        const fetchMetricasAnuales = async () => {
+            const data = await loadMetricasAnualesFromDB(yearSeleccionado);
+            setMetricasAnuales(data);
+        };
+        fetchMetricasAnuales();
+    }, [yearSeleccionado, isSaving]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = parseFloat(e.target.value) || 0;
-        setMetricas(prev => ({ ...prev, [e.target.name]: val }));
+        setMetricasForm(prev => ({ ...prev, [e.target.name]: val }));
     };
 
     const handleSave = async () => {
         setIsSaving(true);
-        await saveMetricasToDB(metricas);
-        alert("Parámetros del mes guardados.");
+        await saveMetricasToDB(metricasForm);
+        alert("Parámetros y Objetivos del mes guardados.");
         setIsSaving(false);
     };
 
-    // 1. FILTRADO DEL MES ACTUAL
-    const eventosMes = useMemo(() => {
-        return siniestros.filter(s => {
-            const date = new Date(s.fechaHora || s.timestamp);
-            return date.toISOString().slice(0, 7) === mesSeleccionado;
-        });
-    }, [siniestros, mesSeleccionado]);
+    // Filtramos todos los eventos del año seleccionado
+    const eventosAño = useMemo(() => {
+        return siniestros.filter(s => (s.fechaHora || s.timestamp).toString().startsWith(yearSeleccionado));
+    }, [siniestros, yearSeleccionado]);
 
-    // 2. DETECCIÓN DE DATOS FALTANTES (GRUPO)
-    const eventosSinGrupo = useMemo(() => {
-        return eventosMes.filter(e => !e.investigacion?.grupo || e.investigacion.grupo.trim() === '');
-    }, [eventosMes]);
+    // Función segura de división (Multiplicada por 10.000 o 100 según corresponda)
+    const calc = (num: number, den: number, multiplier: number = 1) => den > 0 ? Number(((num / den) * multiplier).toFixed(3)) : 0;
 
-    // 3. CÁLCULOS MATEMÁTICOS PARA SINIESTROS
-    const statsSiniestros = useMemo(() => {
-        const s = eventosMes.filter(e => (e.tipoEvento || 'Siniestro') === 'Siniestro');
-        
-        const tot = s.length;
-        const s540 = s.filter(e => e.investigacion?.grupo?.includes('540')).length;
-        const s540Urb = s.filter(e => e.investigacion?.grupo?.includes('540') && e.investigacion?.tipoServicio === 'Urbano').length;
-        const s540Med = s.filter(e => e.investigacion?.grupo?.includes('540') && e.investigacion?.tipoServicio === 'Media Distancia').length;
-        
-        const s570 = s.filter(e => e.investigacion?.grupo?.includes('570')).length;
-        const s570Urb = s.filter(e => e.investigacion?.grupo?.includes('570') && e.investigacion?.tipoServicio === 'Urbano').length;
-        const s570Med = s.filter(e => e.investigacion?.grupo?.includes('570') && e.investigacion?.tipoServicio === 'Media Distancia').length;
-        const s570Larga = s.filter(e => e.investigacion?.grupo?.includes('570') && e.investigacion?.tipoServicio === 'Larga Distancia').length;
+    // =======================================================
+    // 1. CÁLCULO DE SINIESTROS (GRAFICOS ANUALES CON OBJETIVOS)
+    // =======================================================
+    const dataAnualSiniestros = useMemo(() => {
+        const data = [];
+        for (let i = 1; i <= 12; i++) {
+            const mesStr = `${yearSeleccionado}-${i.toString().padStart(2, '0')}`;
+            const mData = metricasAnuales.find(m => m.id === mesStr) || { ...DEFAULT_METRICAS };
+            
+            const s = siniestros.filter(e => (e.fechaHora || e.timestamp).toString().startsWith(mesStr) && (e.tipoEvento || 'Siniestro') === 'Siniestro');
+            const tot = s.length;
+            const s540 = s.filter(e => e.investigacion?.grupo?.includes('540')).length;
+            const s540Urb = s.filter(e => e.investigacion?.grupo?.includes('540') && e.investigacion?.tipoServicio === 'Urbano').length;
+            const s540Med = s.filter(e => e.investigacion?.grupo?.includes('540') && e.investigacion?.tipoServicio === 'Media Distancia').length;
+            const s570 = s.filter(e => e.investigacion?.grupo?.includes('570')).length;
+            const s570Urb = s.filter(e => e.investigacion?.grupo?.includes('570') && e.investigacion?.tipoServicio === 'Urbano').length;
+            const s570Med = s.filter(e => e.investigacion?.grupo?.includes('570') && e.investigacion?.tipoServicio === 'Media Distancia').length;
+            const s570Larga = s.filter(e => e.investigacion?.grupo?.includes('570') && e.investigacion?.tipoServicio === 'Larga Distancia').length;
 
-        const totKms540 = metricas.kmsUrbano540 + metricas.kmsMedia540;
-        const totKms570 = metricas.kmsUrbano570 + metricas.kmsMedia570 + metricas.kmsLarga570;
-        const totKms = totKms540 + totKms570;
+            const totKms540 = mData.kmsUrbano540 + mData.kmsMedia540;
+            const totKms570 = mData.kmsUrbano570 + mData.kmsMedia570 + mData.kmsLarga570;
+            const totKms = totKms540 + totKms570;
 
-        // Función segura de división (Kms multiplicados por 100,000 para legibilidad del índice)
-        const calc = (num: number, den: number, isKm: boolean = false) => den > 0 ? Number(((num / den) * (isKm ? 100000 : 1)).toFixed(3)) : 0;
+            data.push({
+                name: MESES_NOMBRES[i-1],
+                indUnidades: calc(tot, mData.flotaActiva, 100), objUnidades: mData.objUnidades,
+                indConductores: calc(tot, mData.nominaActiva, 100), objConductores: mData.objConductores,
+                indKmsTot: calc(tot, totKms, 10000), objKmsTot: mData.objKmsTotales,
+                indKms540: calc(s540, totKms540, 10000), objKms540: mData.objKms540,
+                indKmsUrb540: calc(s540Urb, mData.kmsUrbano540, 10000), objKmsUrb540: mData.objKmsUrbano540,
+                indKmsMed540: calc(s540Med, mData.kmsMedia540, 10000), objKmsMed540: mData.objKmsMedia540,
+                indKms570: calc(s570, totKms570, 10000), objKms570: mData.objKms570,
+                indKmsUrb570: calc(s570Urb, mData.kmsUrbano570, 10000), objKmsUrb570: mData.objKmsUrbano570,
+                indKmsMed570: calc(s570Med, mData.kmsMedia570, 10000), objKmsMed570: mData.objKmsMedia570,
+                indKmsLarga570: calc(s570Larga, mData.kmsLarga570, 10000), objKmsLarga570: mData.objKmsLarga570,
+            });
+        }
+        return data;
+    }, [metricasAnuales, siniestros, yearSeleccionado]);
 
-        return [
-            { name: 'Siniestros / Nómina Activa', value: calc(tot, metricas.nominaActiva) },
-            { name: 'Siniestros / Flota Activa', value: calc(tot, metricas.flotaActiva) },
-            { name: 'Siniestros / Kms Totales (Índice 100k)', value: calc(tot, totKms, true) },
-            { name: 'Siniestros / Kms Grupo 540 (Índice 100k)', value: calc(s540, totKms540, true) },
-            { name: 'Siniestros / Kms Urb. G540 (Índice 100k)', value: calc(s540Urb, metricas.kmsUrbano540, true) },
-            { name: 'Siniestros / Kms Med. G540 (Índice 100k)', value: calc(s540Med, metricas.kmsMedia540, true) },
-            { name: 'Siniestros / Kms Grupo 570 (Índice 100k)', value: calc(s570, totKms570, true) },
-            { name: 'Siniestros / Kms Urb. G570 (Índice 100k)', value: calc(s570Urb, metricas.kmsUrbano570, true) },
-            { name: 'Siniestros / Kms Med. G570 (Índice 100k)', value: calc(s570Med, metricas.kmsMedia570, true) },
-            { name: 'Siniestros / Kms Larga G570 (Índice 100k)', value: calc(s570Larga, metricas.kmsLarga570, true) }
-        ];
-    }, [eventosMes, metricas]);
-
-    // 4. DATOS PARA GRÁFICOS DE INCIDENTES Y LESIONADOS
-    const dataIncidentesLinea = useMemo(() => {
-        const incidentes = eventosMes.filter(e => e.tipoEvento === 'Incidente');
-        const map: Record<string, number> = {};
-        incidentes.forEach(i => {
-            const linea = i.conductor?.linea || 'Sin Línea';
-            map[linea] = (map[linea] || 0) + 1;
-        });
-        return Object.entries(map).map(([name, Incidentes]) => ({ name, Incidentes })).sort((a,b) => b.Incidentes - a.Incidentes);
-    }, [eventosMes]);
-
-    // Lógica para extraer lesionados de un evento sumando todos los tipos (Leves, Graves, Fallecidos, etc)
+    // =======================================================
+    // 2. CÁLCULO DE INCIDENTES Y LESIONADOS (ANUAL)
+    // =======================================================
     const getLesionadosCount = (e: Siniestro) => {
         let leves = 0, graves = 0, fallecidos = 0;
         if (!e.descripcion?.consecuencias) return { total: 0, leves, graves, fallecidos };
@@ -110,15 +114,31 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                 if (c.tipo.toLowerCase().includes('leve')) leves += q;
                 else if (c.tipo.toLowerCase().includes('grave')) graves += q;
                 else if (c.tipo.toLowerCase().includes('fallecido')) fallecidos += q;
-                else leves += q; // Fallback
+                else leves += q;
             }
         });
         return { total: leves + graves + fallecidos, leves, graves, fallecidos };
     };
 
+    const dataIncidentesLinea = useMemo(() => {
+        const incidentes = eventosAño.filter(e => e.tipoEvento === 'Incidente');
+        const map: Record<string, number> = {};
+        incidentes.forEach(i => { const l = i.conductor?.linea || 'Sin Línea'; map[l] = (map[l] || 0) + 1; });
+        return Object.entries(map).map(([name, Indicador]) => ({ name, Indicador })).sort((a,b) => b.Indicador - a.Indicador);
+    }, [eventosAño]);
+
+    const dataLesionadosMes = useMemo(() => {
+        const data = MESES_NOMBRES.map(m => ({ name: m, Indicador: 0 }));
+        eventosAño.forEach(e => {
+            const monthIndex = new Date(e.fechaHora || e.timestamp).getMonth();
+            data[monthIndex].Indicador += getLesionadosCount(e).total;
+        });
+        return data;
+    }, [eventosAño]);
+
     const dataLesionadosConductor = useMemo(() => {
         const map: Record<string, { name: string, Leves: number, Graves: number, Fallecidos: number, total: number }> = {};
-        eventosMes.forEach(e => {
+        eventosAño.forEach(e => {
             const l = getLesionadosCount(e);
             if (l.total > 0) {
                 const cond = e.conductor?.nombre || 'Desconocido';
@@ -126,12 +146,12 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                 map[cond].Leves += l.leves; map[cond].Graves += l.graves; map[cond].Fallecidos += l.fallecidos; map[cond].total += l.total;
             }
         });
-        return Object.values(map).sort((a,b) => b.total - a.total).slice(0, 15); // Top 15
-    }, [eventosMes]);
+        return Object.values(map).sort((a,b) => b.total - a.total).slice(0, 15);
+    }, [eventosAño]);
 
     const dataLesionadosRecorrido = useMemo(() => {
         const map: Record<string, { name: string, Leves: number, Graves: number, Fallecidos: number, total: number }> = {};
-        eventosMes.forEach(e => {
+        eventosAño.forEach(e => {
             const l = getLesionadosCount(e);
             if (l.total > 0) {
                 const rec = e.conductor?.linea || 'Sin Recorrido';
@@ -140,25 +160,11 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
             }
         });
         return Object.values(map).sort((a,b) => b.total - a.total).slice(0, 15);
-    }, [eventosMes]);
-
-    const dataLesionadosMes = useMemo(() => {
-        // Para este gráfico, evaluamos el año completo del mes seleccionado
-        const year = mesSeleccionado.split('-')[0];
-        const eventosAño = siniestros.filter(s => (s.fechaHora || s.timestamp).toString().startsWith(year));
-        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const data = meses.map((m, i) => ({ name: m, Lesionados: 0 }));
-        
-        eventosAño.forEach(e => {
-            const monthIndex = new Date(e.fechaHora || e.timestamp).getMonth();
-            data[monthIndex].Lesionados += getLesionadosCount(e).total;
-        });
-        return data;
-    }, [siniestros, mesSeleccionado]);
+    }, [eventosAño]);
 
     const dataLesionadosGrupo = useMemo(() => {
         let g540 = 0, g570 = 0, otros = 0;
-        eventosMes.forEach(e => {
+        eventosAño.forEach(e => {
             const t = getLesionadosCount(e).total;
             if (t > 0) {
                 if (e.investigacion?.grupo?.includes('540')) g540 += t;
@@ -171,127 +177,152 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
         if (g570 > 0) data.push({ name: 'Grupo 570', value: g570 });
         if (otros > 0) data.push({ name: 'Otros / Sin Grupo', value: otros });
         return data;
-    }, [eventosMes]);
+    }, [eventosAño]);
+
+
+    // COMPONENTES DE GRÁFICO REUTILIZABLES
+    const ChartCard = ({ title, dataKeyBar, dataKeyObj, color, format }: { title: string, dataKeyBar: string, dataKeyObj: string, color: string, format: string }) => (
+        <div className="bg-white p-6 rounded-xl border border-gray-300 shadow-md h-[450px] mb-8">
+            <h4 className="text-lg font-bold text-gray-800 text-center mb-6">{title}</h4>
+            <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={dataAnualSiniestros} margin={{ top: 30, right: 20, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" fontSize={11} tick={{ fill: '#4b5563' }} />
+                    <YAxis fontSize={11} tickFormatter={(tick) => `${tick}${format}`} />
+                    <ChartTooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    <Bar dataKey={dataKeyBar} name="INDICADOR" fill={color} barSize={40} radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey={dataKeyBar} position="top" fill={color} fontSize={12} formatter={(v:any) => v > 0 ? `${v}${format}` : ''} />
+                    </Bar>
+                    <Line type="step" dataKey={dataKeyObj} name="OBJETIVO" stroke="#f97316" strokeWidth={2} dot={false} activeDot={false} />
+                </ComposedChart>
+            </ResponsiveContainer>
+        </div>
+    );
 
     return (
-        <div className="flex flex-col h-full bg-[#111827] text-white p-6 overflow-y-auto custom-scrollbar">
-            {/* HEADER Y ALERTA DE FALTANTES */}
-            <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col h-full bg-slate-100 text-gray-800 overflow-y-auto w-full">
+            
+            <div className="bg-[#111827] text-white p-6 flex justify-between items-center sticky top-0 z-50 shadow-md flex-shrink-0">
                 <div>
-                    <h2 className="text-2xl font-bold text-sky-400 flex items-center gap-2"><Activity /> Dashboards e Indicadores</h2>
-                    <p className="text-gray-400 text-sm mt-1">Seleccione el mes para calcular métricas y gráficos.</p>
+                    <h2 className="text-2xl font-bold text-sky-400 flex items-center gap-2"><Activity /> Dashboards e Indicadores Anuales</h2>
+                    <p className="text-gray-400 text-sm mt-1">Configure los parámetros mensuales y visualice la evolución estadística.</p>
                 </div>
-                <div className="flex items-center gap-4">
-                    {eventosSinGrupo.length > 0 && (
-                        <button onClick={() => setShowMissingModal(true)} className="bg-red-900/40 border border-red-500 text-red-400 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-red-900/60 transition-colors animate-pulse">
-                            <AlertCircle size={18} /> Faltan Grupos en {eventosSinGrupo.length} Eventos
-                        </button>
-                    )}
-                    <input type="month" value={mesSeleccionado} onChange={(e) => setMesSeleccionado(e.target.value)} className="bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold text-white outline-none focus:border-sky-500" />
-                </div>
+                <select value={yearSeleccionado} onChange={(e) => setYearSeleccionado(e.target.value)} className="bg-gray-800 border border-gray-600 rounded-lg p-3 text-lg font-bold text-white outline-none focus:border-sky-500 cursor-pointer">
+                    {Array.from({ length: new Date().getFullYear() - 2020 + 2 }, (_, i) => (2020 + i).toString()).map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
             </div>
 
-            {/* FORMULARIO DE METRICAS DEL MES */}
-            <div className="bg-gray-800 p-5 rounded-xl border border-gray-700 mb-8 shadow-lg">
-                <h3 className="text-sky-400 font-bold mb-4 uppercase text-sm tracking-wider border-b border-gray-700 pb-2">1. Parámetros del Mes ({mesSeleccionado})</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Nómina Activa</label><input type="number" name="nominaActiva" value={metricas.nominaActiva} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Flota Activa</label><input type="number" name="flotaActiva" value={metricas.flotaActiva} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Kms Urbano (G540)</label><input type="number" name="kmsUrbano540" value={metricas.kmsUrbano540} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Kms Urbano (G570)</label><input type="number" name="kmsUrbano570" value={metricas.kmsUrbano570} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Kms Media Dist. (G540)</label><input type="number" name="kmsMedia540" value={metricas.kmsMedia540} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Kms Media Dist. (G570)</label><input type="number" name="kmsMedia570" value={metricas.kmsMedia570} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                    <div><label className="block text-[10px] text-gray-400 uppercase mb-1">Kms Larga Dist. (G570)</label><input type="number" name="kmsLarga570" value={metricas.kmsLarga570} onChange={handleChange} className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-sky-500" /></div>
-                </div>
-                <button onClick={handleSave} disabled={isSaving} className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-6 rounded-lg flex items-center gap-2 transition-colors text-sm">
-                    <Save size={16}/> Guardar Parámetros
-                </button>
-            </div>
-
-            {/* SECCIÓN SINIESTROS: TABLA + GRÁFICO */}
-            <div className="bg-gray-800 p-5 rounded-xl border border-gray-700 mb-8 shadow-lg">
-                <h3 className="text-red-400 font-bold mb-4 uppercase text-sm tracking-wider border-b border-gray-700 pb-2">2. Métricas de Siniestros (Mes Actual)</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-900 border-b border-gray-700 text-[10px] uppercase text-gray-400">
-                                    <th className="p-3 font-bold">Métrica / Fórmula</th>
-                                    <th className="p-3 font-bold text-right">Resultado</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-700/50">
-                                {statsSiniestros.map((stat, i) => (
-                                    <tr key={i} className="hover:bg-gray-700/30 transition-colors">
-                                        <td className="p-3 text-gray-300">{stat.name}</td>
-                                        <td className="p-3 text-right font-mono text-sky-400 font-bold">{stat.value}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        <p className="text-[10px] text-gray-500 mt-2 italic">* Los índices de Kms están multiplicados x 100.000 para legibilidad.</p>
-                    </div>
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={statsSiniestros} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                                <XAxis type="number" stroke="#9ca3af" fontSize={12} />
-                                <YAxis dataKey="name" type="category" width={150} stroke="#9ca3af" fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }} />
-                                <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-            {/* SECCIÓN INCIDENTES Y LESIONADOS: GRÁFICOS */}
-            <div className="bg-gray-800 p-5 rounded-xl border border-gray-700 mb-8 shadow-lg">
-                <h3 className="text-yellow-400 font-bold mb-6 uppercase text-sm tracking-wider border-b border-gray-700 pb-2">3. Estadísticas de Incidentes y Lesionados</h3>
+            {/* SE USA EL 100% DEL ANCHO DE PANTALLA (w-full px-8) */}
+            <div className="p-8 w-full space-y-8">
                 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                {/* 1. FORMULARIO DE CARGA */}
+                <div className="bg-white p-6 rounded-xl border border-gray-300 shadow-md">
+                    <div className="flex justify-between items-center border-b border-gray-300 pb-3 mb-4">
+                        <h3 className="text-sky-600 font-bold uppercase text-sm tracking-wider">Carga de Parámetros y Objetivos Mensuales</h3>
+                        <input type="month" value={mesFormulario} onChange={(e) => setMesFormulario(e.target.value)} className="bg-gray-100 border border-gray-300 rounded p-2 text-sm font-bold outline-none focus:border-sky-500 cursor-pointer" />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Nómina Activa</label><input type="number" name="nominaActiva" value={metricasForm.nominaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Conductores (%)</label><input type="number" name="objConductores" value={metricasForm.objConductores} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Flota Activa</label><input type="number" name="flotaActiva" value={metricasForm.flotaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Unidades (%)</label><input type="number" name="objUnidades" value={metricasForm.objUnidades} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                        <div className="md:col-span-2 border-t pt-4"><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Kms Totales (Índice 10k)</label><input type="number" name="objKmsTotales" value={metricasForm.objKmsTotales} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 border-t pt-4">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G540)</label><input type="number" name="kmsUrbano540" value={metricasForm.kmsUrbano540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G540</label><input type="number" name="objKmsUrbano540" value={metricasForm.objKmsUrbano540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G570)</label><input type="number" name="kmsUrbano570" value={metricasForm.kmsUrbano570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G570</label><input type="number" name="objKmsUrbano570" value={metricasForm.objKmsUrbano570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G540)</label><input type="number" name="kmsMedia540" value={metricasForm.kmsMedia540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G540</label><input type="number" name="objKmsMedia540" value={metricasForm.objKmsMedia540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G570)</label><input type="number" name="kmsMedia570" value={metricasForm.kmsMedia570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G570</label><input type="number" name="objKmsMedia570" value={metricasForm.objKmsMedia570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Larga Dist. (G570)</label><input type="number" name="kmsLarga570" value={metricasForm.kmsLarga570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Larga G570</label><input type="number" name="objKmsLarga570" value={metricasForm.objKmsLarga570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G540</label><input type="number" name="objKms540" value={metricasForm.objKms540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G570</label><input type="number" name="objKms570" value={metricasForm.objKms570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                    </div>
+
+                    <button onClick={handleSave} disabled={isSaving} className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-8 rounded-lg flex items-center gap-2 transition-colors w-full md:w-auto justify-center">
+                        <Save size={18}/> Guardar Configuración de {mesFormulario}
+                    </button>
+                </div>
+
+
+                {/* 2. GRÁFICOS ANUALES DE SINIESTROS (1 POR FILA) */}
+                <h3 className="text-2xl font-bold text-gray-800 text-center mt-12 uppercase tracking-widest border-b-4 border-red-500 pb-2 inline-block mx-auto">SINIESTROS {yearSeleccionado}</h3>
+                
+                <ChartCard title="Siniestros por Cantidad de Unidades (%)" dataKeyBar="indUnidades" dataKeyObj="objUnidades" color="#0000ff" format="%" />
+                <ChartCard title="Siniestros por Cantidad de Conductores (%)" dataKeyBar="indConductores" dataKeyObj="objConductores" color="#ff0000" format="%" />
+                <ChartCard title="Total Siniestros por C/10.000 Kms Totales" dataKeyBar="indKmsTot" dataKeyObj="objKmsTot" color="#00ff00" format="" />
+                <ChartCard title="Total Siniestros por C/10.000 Kms G540" dataKeyBar="indKms540" dataKeyObj="objKms540" color="#00ff00" format="" />
+                <ChartCard title="Total Siniestros por C/10.000 Kms G570" dataKeyBar="indKms570" dataKeyObj="objKms570" color="#0000ff" format="" />
+                <ChartCard title="Siniestros por C/10.000 Kms URBANO G540" dataKeyBar="indKmsUrb540" dataKeyObj="objKmsUrb540" color="#0000ff" format="" />
+                <ChartCard title="Siniestros por C/10.000 Kms URBANO G570" dataKeyBar="indKmsUrb570" dataKeyObj="objKmsUrb570" color="#ff0000" format="" />
+                <ChartCard title="Siniestros por C/10.000 Kms Media Distancia G540" dataKeyBar="indKmsMed540" dataKeyObj="objKmsMed540" color="#0000ff" format="" />
+                <ChartCard title="Siniestros por C/10.000 Kms Media Distancia G570" dataKeyBar="indKmsMed570" dataKeyObj="objKmsMed570" color="#00ff00" format="" />
+                <ChartCard title="Siniestros por C/10.000 Kms Larga Distancia G570" dataKeyBar="indKmsLarga570" dataKeyObj="objKmsLarga570" color="#0000ff" format="" />
+
+
+                {/* 3. GRÁFICOS DE INCIDENTES Y LESIONADOS */}
+                <h3 className="text-2xl font-bold text-gray-800 text-center mt-16 uppercase tracking-widest border-b-4 border-yellow-500 pb-2 inline-block mx-auto">INCIDENTES Y LESIONADOS {yearSeleccionado}</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                     {/* INCIDENTES POR LÍNEA */}
-                    <div className="h-[300px] bg-gray-900 p-4 rounded-lg border border-gray-700">
-                        <h4 className="text-xs font-bold text-gray-400 text-center mb-4 uppercase">Incidentes por Línea (Mes)</h4>
+                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
+                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Cantidad de Incidentes por Línea</h4>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataIncidentesLinea} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-                                <XAxis dataKey="name" stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} />
-                                <YAxis stroke="#9ca3af" fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }} />
-                                <Bar dataKey="Incidentes" fill="#eab308" radius={[4, 4, 0, 0]} />
+                            <BarChart data={dataIncidentesLinea} margin={{ top: 30, right: 5, left: -20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" fontSize={11} />
+                                <YAxis fontSize={11} />
+                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
+                                <Bar dataKey="Indicador" fill="#eab308" radius={[4, 4, 0, 0]}>
+                                    <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={11} formatter={(v:any) => v > 0 ? v : ''} />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
 
-                    {/* LESIONADOS POR MES (ANUAL) */}
-                    <div className="h-[300px] bg-gray-900 p-4 rounded-lg border border-gray-700">
-                        <h4 className="text-xs font-bold text-gray-400 text-center mb-4 uppercase">Evolución Lesionados por Mes (Año {mesSeleccionado.split('-')[0]})</h4>
+                    {/* LESIONADOS POR MES */}
+                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
+                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Cantidad de Lesionados por Mes</h4>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataLesionadosMes} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-                                <XAxis dataKey="name" stroke="#9ca3af" fontSize={10} />
-                                <YAxis stroke="#9ca3af" fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }} />
-                                <Bar dataKey="Lesionados" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                            <BarChart data={dataLesionadosMes} margin={{ top: 30, right: 5, left: -20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" fontSize={11} />
+                                <YAxis fontSize={11} />
+                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
+                                <Bar dataKey="Indicador" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
+                                    <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={11} formatter={(v:any) => v > 0 ? v : ''} />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                     {/* LESIONADOS POR CONDUCTOR */}
-                    <div className="h-[400px] bg-gray-900 p-4 rounded-lg border border-gray-700">
-                        <h4 className="text-xs font-bold text-gray-400 text-center mb-4 uppercase">Lesionados por Conductor (Top 15)</h4>
+                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
+                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Lesionados por Conductor (Top 15)</h4>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataLesionadosConductor} layout="vertical" margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                                <XAxis type="number" stroke="#9ca3af" fontSize={10} />
-                                <YAxis dataKey="name" type="category" width={100} stroke="#9ca3af" fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }} />
-                                <Legend wrapperStyle={{ fontSize: '10px' }} />
+                            <BarChart data={dataLesionadosConductor} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                <XAxis type="number" fontSize={11} />
+                                <YAxis dataKey="name" type="category" width={100} fontSize={10} />
+                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
+                                <Legend wrapperStyle={{ fontSize: '11px' }} />
                                 <Bar dataKey="Leves" stackId="a" fill="#10b981" />
                                 <Bar dataKey="Graves" stackId="a" fill="#f59e0b" />
                                 <Bar dataKey="Fallecidos" stackId="a" fill="#ef4444" />
@@ -300,15 +331,15 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                     </div>
 
                     {/* LESIONADOS POR RECORRIDO */}
-                    <div className="h-[400px] bg-gray-900 p-4 rounded-lg border border-gray-700">
-                        <h4 className="text-xs font-bold text-gray-400 text-center mb-4 uppercase">Lesionados por Recorrido (Top 15)</h4>
+                    <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md">
+                        <h4 className="text-sm font-bold text-gray-800 text-center mb-6 uppercase">Lesionados por Recorrido (Top 15)</h4>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dataLesionadosRecorrido} layout="vertical" margin={{ top: 5, right: 5, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                                <XAxis type="number" stroke="#9ca3af" fontSize={10} />
-                                <YAxis dataKey="name" type="category" width={100} stroke="#9ca3af" fontSize={10} />
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }} />
-                                <Legend wrapperStyle={{ fontSize: '10px' }} />
+                            <BarChart data={dataLesionadosRecorrido} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                <XAxis type="number" fontSize={11} />
+                                <YAxis dataKey="name" type="category" width={100} fontSize={10} />
+                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
+                                <Legend wrapperStyle={{ fontSize: '11px' }} />
                                 <Bar dataKey="Leves" stackId="a" fill="#10b981" />
                                 <Bar dataKey="Graves" stackId="a" fill="#f59e0b" />
                                 <Bar dataKey="Fallecidos" stackId="a" fill="#ef4444" />
@@ -318,49 +349,23 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                 </div>
 
                 {/* LESIONADOS POR GRUPO (TORTA) */}
-                <div className="h-[300px] bg-gray-900 p-4 rounded-lg border border-gray-700 flex flex-col items-center">
-                    <h4 className="text-xs font-bold text-gray-400 text-center mb-2 uppercase w-full">Distribución de Lesionados por Grupo</h4>
+                <div className="h-[400px] bg-white p-6 rounded-xl border border-gray-300 shadow-md flex flex-col items-center">
+                    <h4 className="text-sm font-bold text-gray-800 text-center mb-2 uppercase w-full">Cantidad de Lesionados x Grupo</h4>
                     {dataLesionadosGrupo.length === 0 ? (
-                        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">No hay lesionados registrados este mes.</div>
+                        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">No hay lesionados registrados este año.</div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                                <Pie data={dataLesionadosGrupo} cx="50%" cy="50%" labelLine={true} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} outerRadius={80} fill="#8884d8" dataKey="value">
+                                <Pie data={dataLesionadosGrupo} cx="50%" cy="50%" labelLine={true} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(2)}%)`} outerRadius={120} fill="#8884d8" dataKey="value">
                                     {dataLesionadosGrupo.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                 </Pie>
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }} />
+                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px' }} />
                             </PieChart>
                         </ResponsiveContainer>
                     )}
                 </div>
-            </div>
 
-            {/* MODAL DE ADVERTENCIA: DATOS FALTANTES */}
-            {showMissingModal && (
-                <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4">
-                    <div className="bg-gray-900 rounded-xl w-full max-w-2xl border border-red-500 shadow-2xl flex flex-col max-h-[80vh]">
-                        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-red-900/20">
-                            <h3 className="font-bold text-lg text-red-400 flex items-center gap-2"><AlertCircle /> Atención Administrativa Requerida</h3>
-                            <button onClick={() => setShowMissingModal(false)} className="text-gray-400 hover:text-white"><X size={24}/></button>
-                        </div>
-                        <div className="p-6 overflow-y-auto flex-1 text-sm text-gray-300">
-                            <p className="mb-4">Para que los cálculos de <b>Indicadores por Grupo (540/570)</b> sean precisos, es obligatorio que todos los eventos del mes tengan asignado su Grupo en la pestaña <b>Seguimiento CRM</b>.</p>
-                            <p className="mb-4 font-bold text-white">Los siguientes eventos de {mesSeleccionado} no tienen grupo asignado:</p>
-                            <ul className="space-y-2">
-                                {eventosSinGrupo.map(e => (
-                                    <li key={e.id} className="bg-black p-3 rounded border border-gray-800 flex justify-between">
-                                        <span><b>{new Date(e.fechaHora).toLocaleDateString('es-AR')}</b> | {e.conductor?.nombre} (Línea: {e.conductor?.linea})</span>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${e.tipoEvento==='Incidente'?'bg-yellow-900 text-yellow-400':'bg-red-900 text-red-400'}`}>{e.tipoEvento || 'Siniestro'}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="p-4 border-t border-gray-800 bg-black text-right">
-                            <button onClick={() => setShowMissingModal(false)} className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold">Cerrar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            </div>
         </div>
     );
 };
