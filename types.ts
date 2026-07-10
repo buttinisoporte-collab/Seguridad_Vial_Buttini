@@ -23,10 +23,13 @@ export interface VictimaDetalle {
     id: string;
     nombre: string;
     dni: string;
+    domicilio?: string;
+    telefono?: string;
+    correo?: string;
 }
 
 export interface MetricasMensuales {
-    id: string; // "YYYY-MM"
+    id: string; 
     nominaActiva: number;
     flotaActiva: number;
     kmsUrbano540: number;
@@ -34,6 +37,17 @@ export interface MetricasMensuales {
     kmsMedia540: number;
     kmsMedia570: number;
     kmsLarga570: number;
+    // OBJETIVOS
+    objUnidades: number;
+    objConductores: number;
+    objKmsTotales: number;
+    objKms540: number;
+    objKmsUrbano540: number;
+    objKmsMedia540: number;
+    objKms570: number;
+    objKmsUrbano570: number;
+    objKmsMedia570: number;
+    objKmsLarga570: number;
 }
 
 export interface InvestigacionData {

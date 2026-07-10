@@ -211,13 +211,14 @@ import type { MetricasMensuales } from '../types';
 export const saveMetricasToDB = async (metricas: MetricasMensuales) => {
     await supabase.from('metricas_mensuales').upsert({
         id: metricas.id,
-        nomina_activa: metricas.nominaActiva,
-        flota_activa: metricas.flotaActiva,
-        kms_urbano_540: metricas.kmsUrbano540,
-        kms_urbano_570: metricas.kmsUrbano570,
-        kms_media_540: metricas.kmsMedia540,
-        kms_media_570: metricas.kmsMedia570,
-        kms_larga_570: metricas.kmsLarga570
+        nomina_activa: metricas.nominaActiva, flota_activa: metricas.flotaActiva,
+        kms_urbano_540: metricas.kmsUrbano540, kms_urbano_570: metricas.kmsUrbano570,
+        kms_media_540: metricas.kmsMedia540, kms_media_570: metricas.kmsMedia570, kms_larga_570: metricas.kmsLarga570,
+        obj_unidades: metricas.objUnidades, obj_conductores: metricas.objConductores,
+        obj_kms_totales: metricas.objKmsTotales, obj_kms_540: metricas.objKms540,
+        obj_kms_urbano_540: metricas.objKmsUrbano540, obj_kms_media_540: metricas.objKmsMedia540,
+        obj_kms_570: metricas.objKms570, obj_kms_urbano_570: metricas.objKmsUrbano570,
+        obj_kms_media_570: metricas.objKmsMedia570, obj_kms_larga_570: metricas.objKmsLarga570
     });
 };
 
@@ -225,13 +226,28 @@ export const loadMetricasFromDB = async (id: string): Promise<MetricasMensuales 
     const { data, error } = await supabase.from('metricas_mensuales').select('*').eq('id', id).single();
     if (error || !data) return null;
     return {
-        id: data.id,
-        nominaActiva: data.nomina_activa,
-        flotaActiva: data.flota_activa,
-        kmsUrbano540: data.kms_urbano_540,
-        kmsUrbano570: data.kms_urbano_570,
-        kmsMedia540: data.kms_media_540,
-        kmsMedia570: data.kms_media_570,
-        kmsLarga570: data.kms_larga_570
+        id: data.id, nominaActiva: data.nomina_activa, flotaActiva: data.flota_activa,
+        kmsUrbano540: data.kms_urbano_540, kmsUrbano570: data.kms_urbano_570,
+        kmsMedia540: data.kms_media_540, kmsMedia570: data.kms_media_570, kmsLarga570: data.kms_larga_570,
+        objUnidades: data.obj_unidades, objConductores: data.obj_conductores,
+        objKmsTotales: data.obj_kms_totales, objKms540: data.obj_kms_540,
+        objKmsUrbano540: data.obj_kms_urbano_540, objKmsMedia540: data.obj_kms_media_540,
+        objKms570: data.obj_kms_570, objKmsUrbano570: data.obj_kms_urbano_570,
+        objKmsMedia570: data.obj_kms_media_570, objKmsLarga570: data.obj_kms_larga_570
     };
+};
+
+export const loadMetricasAnualesFromDB = async (year: string): Promise<MetricasMensuales[]> => {
+    const { data, error } = await supabase.from('metricas_mensuales').select('*').like('id', `${year}-%`);
+    if (error || !data) return [];
+    return data.map(d => ({
+        id: d.id, nominaActiva: d.nomina_activa, flotaActiva: d.flota_activa,
+        kmsUrbano540: d.kms_urbano_540, kmsUrbano570: d.kms_urbano_570,
+        kmsMedia540: d.kms_media_540, kmsMedia570: d.kms_media_570, kmsLarga570: d.kms_larga_570,
+        objUnidades: d.obj_unidades, objConductores: d.obj_conductores,
+        objKmsTotales: d.obj_kms_totales, objKms540: d.obj_kms_540,
+        objKmsUrbano540: d.obj_kms_urbano_540, objKmsMedia540: d.obj_kms_media_540,
+        objKms570: d.obj_kms_570, objKmsUrbano570: d.obj_kms_urbano_570,
+        objKmsMedia570: d.obj_kms_media_570, objKmsLarga570: d.obj_kms_larga_570
+    }));
 };
