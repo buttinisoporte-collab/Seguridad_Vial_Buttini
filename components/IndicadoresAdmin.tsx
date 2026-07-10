@@ -23,6 +23,7 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
     const [metricasAnuales, setMetricasAnuales] = useState<MetricasMensuales[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Cargar datos para el formulario (Mes Específico)
     useEffect(() => {
         const fetchMetricasForm = async () => {
             const data = await loadMetricasFromDB(mesFormulario);
@@ -32,6 +33,7 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
         fetchMetricasForm();
     }, [mesFormulario]);
 
+    // Cargar TODAS las métricas del año para armar los gráficos
     useEffect(() => {
         const fetchMetricasAnuales = async () => {
             const data = await loadMetricasAnualesFromDB(yearSeleccionado);
@@ -53,10 +55,12 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
         setIsSaving(false);
     };
 
+    // Filtramos todos los eventos del año seleccionado
     const eventosAño = useMemo(() => {
         return siniestros.filter(s => (s.fechaHora || s.timestamp).toString().startsWith(yearSeleccionado));
     }, [siniestros, yearSeleccionado]);
 
+    // Función segura de división (Multiplicada por 10.000 o 100 según corresponda)
     const calc = (num: number, den: number, multiplier: number = 1) => den > 0 ? Number(((num / den) * multiplier).toFixed(3)) : 0;
 
     // =======================================================
@@ -189,7 +193,6 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={dataAnualSiniestros} margin={{ top: 20, right: 10, left: -20, bottom: 25 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        {/* height={45} y angle={-45} evitan que los nombres de los meses se corten */}
                         <XAxis dataKey="name" fontSize={10} tick={{ fill: '#4b5563' }} angle={-45} textAnchor="end" height={45} />
                         <YAxis fontSize={10} tickFormatter={(tick) => `${tick}${format}`} />
                         <ChartTooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '12px' }} />
@@ -284,18 +287,18 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                 <h3 className="text-2xl font-bold text-gray-800 text-center mt-12 uppercase tracking-widest border-b-4 border-yellow-500 pb-2 inline-block mx-auto">INCIDENTES Y LESIONADOS {yearSeleccionado}</h3>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    {/* INCIDENTES POR LÍNEA */}
+                    {/* INCIDENTES POR LÍNEA - BARRAS HORIZONTALES */}
                     <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col">
                         <h4 className="text-xs font-bold text-gray-800 text-center mb-2 uppercase">Cantidad de Incidentes por Línea</h4>
                         <div className="flex-1 min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={dataIncidentesLinea} margin={{ top: 20, right: 5, left: -20, bottom: 45 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="name" fontSize={10} tick={{ fill: '#4b5563' }} angle={-45} textAnchor="end" height={50} />
-                                    <YAxis fontSize={10} />
+                                <BarChart data={dataIncidentesLinea} layout="vertical" margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" fontSize={10} />
+                                    <YAxis dataKey="name" type="category" width={220} fontSize={9} tickFormatter={(v) => v.length > 35 ? v.substring(0,35)+'...' : v} />
                                     <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
-                                    <Bar dataKey="Indicador" fill="#eab308" radius={[2, 2, 0, 0]}>
-                                        <LabelList dataKey="Indicador" position="top" fill="#6b7280" fontSize={10} formatter={(v:any) => v > 0 ? v : ''} />
+                                    <Bar dataKey="Indicador" fill="#eab308" radius={[0, 4, 4, 0]}>
+                                        <LabelList dataKey="Indicador" position="right" fill="#6b7280" fontSize={10} formatter={(v:any) => v > 0 ? v : ''} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
@@ -327,10 +330,10 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                         <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase">Lesionados por Conductor (Top 15)</h4>
                         <div className="flex-1 min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={dataLesionadosConductor} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                                <BarChart data={dataLesionadosConductor} layout="vertical" margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" fontSize={10} />
-                                    <YAxis dataKey="name" type="category" width={140} fontSize={9} tickFormatter={(v) => v.length > 22 ? v.substring(0,20)+'...' : v} />
+                                    <YAxis dataKey="name" type="category" width={220} fontSize={9} tickFormatter={(v) => v.length > 35 ? v.substring(0,35)+'...' : v} />
                                     <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
                                     <Legend wrapperStyle={{ fontSize: '10px' }} />
                                     <Bar dataKey="Leves" stackId="a" fill="#10b981" />
@@ -346,10 +349,10 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                         <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase">Lesionados por Recorrido (Top 15)</h4>
                         <div className="flex-1 min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={dataLesionadosRecorrido} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                                <BarChart data={dataLesionadosRecorrido} layout="vertical" margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" fontSize={10} />
-                                    <YAxis dataKey="name" type="category" width={140} fontSize={9} tickFormatter={(v) => v.length > 22 ? v.substring(0,20)+'...' : v} />
+                                    <YAxis dataKey="name" type="category" width={220} fontSize={9} tickFormatter={(v) => v.length > 35 ? v.substring(0,35)+'...' : v} />
                                     <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
                                     <Legend wrapperStyle={{ fontSize: '10px' }} />
                                     <Bar dataKey="Leves" stackId="a" fill="#10b981" />
@@ -361,21 +364,35 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                     </div>
                 </div>
 
-                {/* LESIONADOS POR GRUPO (TORTA) */}
-                <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col items-center">
-                    <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase w-full">Cantidad de Lesionados x Grupo</h4>
-                    {dataLesionadosGrupo.length === 0 ? (
-                        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">No hay lesionados registrados este año.</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={dataLesionadosGrupo} cx="50%" cy="50%" labelLine={true} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`} outerRadius={90} fill="#8884d8" dataKey="value" style={{fontSize: '11px'}}>
-                                    {dataLesionadosGrupo.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                </Pie>
-                                <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    )}
+                {/* LESIONADOS POR GRUPO (TORTA) - AHORA OCUPA MEDIA PANTALLA */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div className="h-[280px] bg-white p-4 rounded-xl border border-gray-300 shadow-md flex flex-col items-center">
+                        <h4 className="text-xs font-bold text-gray-800 text-center mb-1 uppercase w-full">Cantidad de Lesionados x Grupo</h4>
+                        {dataLesionadosGrupo.length === 0 ? (
+                            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">No hay lesionados registrados este año.</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie 
+                                        data={dataLesionadosGrupo} 
+                                        cx="50%" 
+                                        cy="50%" 
+                                        labelLine={true} 
+                                        label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`} 
+                                        outerRadius={70} 
+                                        fill="#8884d8" 
+                                        dataKey="value" 
+                                        style={{fontSize: '10px'}}
+                                    >
+                                        {dataLesionadosGrupo.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                    </Pie>
+                                    <ChartTooltip contentStyle={{ backgroundColor: '#1f2937', color: '#fff', borderRadius: '8px', fontSize: '11px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                    {/* El div vacío al lado permite que la torta solo ocupe la mitad izquierda en monitores grandes */}
+                    <div className="hidden lg:block"></div>
                 </div>
 
             </div>
