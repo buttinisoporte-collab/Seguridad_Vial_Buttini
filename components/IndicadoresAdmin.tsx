@@ -43,7 +43,9 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
     }, [yearSeleccionado, isSaving]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = parseFloat(e.target.value) || 0;
+        // Se cambió a parseFloat y se admite cualquier valor
+        let val = parseFloat(e.target.value);
+        if (isNaN(val)) val = 0;
         setMetricasForm(prev => ({ ...prev, [e.target.name]: val }));
     };
 
@@ -182,8 +184,8 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
 
     // COMPONENTES DE GRÁFICO REUTILIZABLES
     const ChartCard = ({ title, dataKeyBar, dataKeyObj, color, format }: { title: string, dataKeyBar: string, dataKeyObj: string, color: string, format: string }) => (
-        <div className="bg-white p-6 rounded-xl border border-gray-300 shadow-md h-[450px] mb-8">
-            <h4 className="text-lg font-bold text-gray-800 text-center mb-6">{title}</h4>
+        <div className="bg-white p-6 rounded-xl border border-gray-300 shadow-md h-[400px] mb-8">
+            <h4 className="text-sm font-bold text-gray-800 text-center mb-6">{title}</h4>
             <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={dataAnualSiniestros} margin={{ top: 30, right: 20, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -201,7 +203,7 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
     );
 
     return (
-        <div className="flex flex-col h-full bg-slate-100 text-gray-800 overflow-y-auto w-full">
+        <div className="flex flex-col h-full bg-slate-100 text-gray-800 overflow-y-auto custom-scrollbar w-full">
             
             <div className="bg-[#111827] text-white p-6 flex justify-between items-center sticky top-0 z-50 shadow-md flex-shrink-0">
                 <div>
@@ -213,7 +215,6 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                 </select>
             </div>
 
-            {/* SE USA EL 100% DEL ANCHO DE PANTALLA (w-full px-8) */}
             <div className="p-8 w-full space-y-8">
                 
                 {/* 1. FORMULARIO DE CARGA */}
@@ -223,35 +224,36 @@ export const IndicadoresAdmin: React.FC<IndicadoresAdminProps> = ({ siniestros }
                         <input type="month" value={mesFormulario} onChange={(e) => setMesFormulario(e.target.value)} className="bg-gray-100 border border-gray-300 rounded p-2 text-sm font-bold outline-none focus:border-sky-500 cursor-pointer" />
                     </div>
                     
+                    {/* SE AGREGÓ step="any" A TODOS LOS INPUTS TYPE="number" */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Nómina Activa</label><input type="number" name="nominaActiva" value={metricasForm.nominaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Conductores (%)</label><input type="number" name="objConductores" value={metricasForm.objConductores} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Flota Activa</label><input type="number" name="flotaActiva" value={metricasForm.flotaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Unidades (%)</label><input type="number" name="objUnidades" value={metricasForm.objUnidades} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Nómina Activa</label><input type="number" step="any" name="nominaActiva" value={metricasForm.nominaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Conductores (%)</label><input type="number" step="any" name="objConductores" value={metricasForm.objConductores} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Flota Activa</label><input type="number" step="any" name="flotaActiva" value={metricasForm.flotaActiva} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Unidades (%)</label><input type="number" step="any" name="objUnidades" value={metricasForm.objUnidades} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                        <div className="md:col-span-2 border-t pt-4"><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Kms Totales (Índice 10k)</label><input type="number" name="objKmsTotales" value={metricasForm.objKmsTotales} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div className="md:col-span-2 border-t pt-4"><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Kms Totales (Índice 10k)</label><input type="number" step="any" name="objKmsTotales" value={metricasForm.objKmsTotales} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 border-t pt-4">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G540)</label><input type="number" name="kmsUrbano540" value={metricasForm.kmsUrbano540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G540</label><input type="number" name="objKmsUrbano540" value={metricasForm.objKmsUrbano540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G570)</label><input type="number" name="kmsUrbano570" value={metricasForm.kmsUrbano570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G570</label><input type="number" name="objKmsUrbano570" value={metricasForm.objKmsUrbano570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G540)</label><input type="number" step="any" name="kmsUrbano540" value={metricasForm.kmsUrbano540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G540</label><input type="number" step="any" name="objKmsUrbano540" value={metricasForm.objKmsUrbano540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Urbano (G570)</label><input type="number" step="any" name="kmsUrbano570" value={metricasForm.kmsUrbano570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Urbano G570</label><input type="number" step="any" name="objKmsUrbano570" value={metricasForm.objKmsUrbano570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G540)</label><input type="number" name="kmsMedia540" value={metricasForm.kmsMedia540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G540</label><input type="number" name="objKmsMedia540" value={metricasForm.objKmsMedia540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G570)</label><input type="number" name="kmsMedia570" value={metricasForm.kmsMedia570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G570</label><input type="number" name="objKmsMedia570" value={metricasForm.objKmsMedia570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G540)</label><input type="number" step="any" name="kmsMedia540" value={metricasForm.kmsMedia540} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G540</label><input type="number" step="any" name="objKmsMedia540" value={metricasForm.objKmsMedia540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Media Dist. (G570)</label><input type="number" step="any" name="kmsMedia570" value={metricasForm.kmsMedia570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Media G570</label><input type="number" step="any" name="objKmsMedia570" value={metricasForm.objKmsMedia570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Larga Dist. (G570)</label><input type="number" name="kmsLarga570" value={metricasForm.kmsLarga570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Larga G570</label><input type="number" name="objKmsLarga570" value={metricasForm.objKmsLarga570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G540</label><input type="number" name="objKms540" value={metricasForm.objKms540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
-                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G570</label><input type="number" name="objKms570" value={metricasForm.objKms570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Kms Larga Dist. (G570)</label><input type="number" step="any" name="kmsLarga570" value={metricasForm.kmsLarga570} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded p-2 outline-none" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. Larga G570</label><input type="number" step="any" name="objKmsLarga570" value={metricasForm.objKmsLarga570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G540</label><input type="number" step="any" name="objKms540" value={metricasForm.objKms540} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
+                        <div><label className="block text-[10px] text-gray-500 uppercase mb-1">Obj. TOTAL G570</label><input type="number" step="any" name="objKms570" value={metricasForm.objKms570} onChange={handleChange} className="w-full bg-orange-50 border border-orange-300 rounded p-2 outline-none text-orange-700 font-bold" /></div>
                     </div>
 
                     <button onClick={handleSave} disabled={isSaving} className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-8 rounded-lg flex items-center gap-2 transition-colors w-full md:w-auto justify-center">
