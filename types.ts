@@ -1,4 +1,4 @@
-export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'novedades' | 'siniestros' | 'settings' | 'users';
+export type AppTab = 'routes' | 'riskTypes' | 'reports' | 'riskViewer' | 'settings' | 'users' | 'novedades' | 'siniestros' | 'seguimiento' | 'indicadores';
 
 export interface Position { lat: number; lng: number; }
 export interface RiskType { id: string; name: string; color: string; isIncident: boolean; }
@@ -19,8 +19,64 @@ export interface Risk {
 
 export interface Consecuencia { tipo: string; activa: boolean; cantidad: string; }
 
+export interface VictimaDetalle {
+    id: string;
+    nombre: string;
+    dni: string;
+    domicilio?: string;
+    telefono?: string;
+    correo?: string;
+}
+
+export interface MetricasMensuales {
+    id: string; 
+    nominaActiva: number;
+    flotaActiva: number;
+    kmsUrbano540: number;
+    kmsUrbano570: number;
+    kmsMedia540: number;
+    kmsMedia570: number;
+    kmsLarga570: number;
+    // OBJETIVOS
+    objUnidades: number;
+    objConductores: number;
+    objKmsTotales: number;
+    objKms540: number;
+    objKmsUrbano540: number;
+    objKmsMedia540: number;
+    objKms570: number;
+    objKmsUrbano570: number;
+    objKmsMedia570: number;
+    objKmsLarga570: number;
+}
+
+export interface InvestigacionData {
+    zona?: string;
+    numeroSiniestro?: string;
+    grupo?: string;
+    tipoServicio?: string;
+    dominio?: string;
+    sectorDanado?: string;
+    accionCorrectiva?: string;
+    presentoReclamo?: string;
+    ampliacionDeclaracion?: string;
+    ampliacionLugar?: string;
+    estadoAmd?: string;
+    estadoJudicial?: string;
+    responsabilidadFinal?: string;
+    responsabilidadCsv?: string;
+    franquicia?: string;
+    seguroTercero?: string;
+    ofrecimiento?: string;
+    pretension?: string;
+    estadoReclamo?: string;
+    abonado?: string;
+    linkVideoCamara?: string;
+    victimasDetalle?: VictimaDetalle[];
+}
+
 export interface Siniestro {
-    id: string; timestamp: number; fechaHora: string;
+    id: string; tipoEvento?: 'Siniestro' | 'Incidente'; timestamp: number; fechaHora: string; investigacion?: InvestigacionData;
     ubicacion: { lat?: number; lng?: number; manual: string; lugar: string; };
     conductor: { nombre: string; legajo: string; interno: string; kilometraje: string; linea: string; };
     descripcion: { tipo: string; resumen: string; consecuencias: Consecuencia[]; factoresCausales: string; gravedad: string; };

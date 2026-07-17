@@ -31,11 +31,36 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
     // Los servicios dependen de la línea filtrada (si hay una)
     const uniqueServices = useMemo(() => Array.from(new Set(routes.filter(r => (!filterGroup || r.group === filterGroup) && (!filterLine || r.line === filterLine)).map(r => r.service))).sort(),[routes, filterGroup, filterLine]);
 
-    const handleShare = (e: React.MouseEvent, route: Route) => {
+    // FUNCION DE COMPARTIR MEJORADA
+    const handleShare = async (e: React.MouseEvent, route: Route) => {
         e.stopPropagation();
-        togglePublicRoute(route.id);
         const url = `${window.location.origin}${window.location.pathname}?publicRoute=${route.id}`;
-        if (!route.isPublic) navigator.clipboard.writeText(url).then(() => alert(`Link copiado para conductores.`));
+        
+        if (route.isPublic) {
+            // Si la ruta YA ES pública, damos opciones para evitar apagarla por error
+            if (window.confirm(`Este enlace ya está ACTIVO.\n\nPresione [Aceptar] para volver a COPIAR el enlace.\nPresione [Cancelar] para DESACTIVARLO.`)) {
+                // Intenta copiar de nuevo sin cambiar el estado
+                try {
+                    if (navigator.clipboard) await navigator.clipboard.writeText(url);
+                    alert("¡Enlace copiado de nuevo!");
+                } catch (err) {
+                    alert(`Cópielo manualmente seleccionando este texto:\n\n${url}`);
+                }
+            } else {
+                // Cancela = Desactiva la ruta pública
+                togglePublicRoute(route.id);
+                alert("Enlace desactivado exitosamente.");
+            }
+        } else {
+            // Si NO ES pública, la activamos y copiamos
+            togglePublicRoute(route.id);
+            try {
+                if (navigator.clipboard) await navigator.clipboard.writeText(url);
+                alert(`¡Enlace activado y copiado al portapapeles!\n\n${url}`);
+            } catch (err) {
+                alert(`Enlace activado. Cópielo manualmente seleccionando este texto:\n\n${url}`);
+            }
+        }
     };
 
     // Orden alfabético ascendente por nombre
@@ -83,7 +108,7 @@ export const RouteManager: React.FC<RouteManagerProps> = ({
                             <p className="text-[10px] text-sky-400 font-mono uppercase">G:{route.group} L:{route.line} S:{route.service}</p>
                         </div>
                         <div className="flex gap-1 ml-2">
-                            <button onClick={(e) => handleShare(e, route)} className={`p-2 rounded-md ${route.isPublic ? 'text-green-400 bg-green-900/20' : 'text-gray-500 hover:text-white'}`}><LinkIcon size={16} /></button>
+                            <button onClick={(e) => handleShare(e, route)} className={`p-2 rounded-md ${route.isPublic ? 'text-green-400 bg-green-900/20 shadow-[0_0_8px_rgba(74,222,128,0.3)]' : 'text-gray-500 hover:text-white'}`}><LinkIcon size={16} /></button>
                             {isAdmin && <button onClick={(e) => { e.stopPropagation(); if(window.confirm('¿Eliminar?')) setRoutes(p => p.filter(r => r.id !== route.id)); }} className="text-red-400 hover:text-red-300 p-2"><Trash2 size={16} /></button>}
                         </div>
                     </div>

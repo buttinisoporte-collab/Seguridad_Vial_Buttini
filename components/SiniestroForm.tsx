@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { ShieldAlert, MapPin, Camera, CheckCircle, Trash2, Image as ImageIcon, X } from 'lucide-react';
 import type { Siniestro, Consecuencia } from '../types';
-import { uploadSiniestroImage } from '../lib/firebase';
+import { uploadSiniestroImage, loadExternalData } from '../lib/supabase';
 
 interface SiniestroFormProps { 
     onSaveSiniestro: (sin: Siniestro) => Promise<void>; 
@@ -37,6 +37,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
     const[selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
     const[f, setF] = useState({
+        tipoEvento: (initialSiniestro?.tipoEvento || 'Siniestro') as 'Siniestro' | 'Incidente',
         fechaHora: new Date().toISOString().slice(0,16), ubicacionManual: '', lugar: 'Ciudad',
         climas: [] as string[], caminos:[] as string[], visibilidades: [] as string[],
         condNombre: '', condLegajo: '', condInterno: '', condKm: '', condLinea: '',
@@ -47,6 +48,27 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
         intervencionPolicial: false, hayTestigos: false, testigosInfo: '', driveUrl: ''
     });
 
+    // Estado para guardar los datos de la BD externa
+    const [externalLists, setExternalLists] = useState({ conductores: [] as any[], unidades: [] as any[], servicios: [] as any[] });
+
+    // Cargar las 3 listas al abrir el formulario
+    useEffect(() => {
+        loadExternalData().then(data => setExternalLists(data));
+    }, []);
+
+    // Función especial para cuando seleccionan un conductor (autocompleta el legajo)
+    const handleConductorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        // ⚠️ ATENCIÓN: Asegúrate de que 'nombre' y 'legajo' sean las columnas reales de tu BD
+        const conductor = externalLists.conductores.find(c => c.nombre === val);
+        
+        setF(prev => ({
+            ...prev,
+            condNombre: val,
+            condLegajo: conductor ? conductor.legajo : prev.condLegajo // Si lo encuentra, llena el legajo
+        }));
+    };
+    
     useEffect(() => {
         if (initialSiniestro) {
             if (initialSiniestro.ubicacion.lat && initialSiniestro.ubicacion.lng) {
@@ -64,6 +86,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
             }
 
             setF({
+                tipoEvento: initialSiniestro.tipoEvento || 'Siniestro',
                 fechaHora: initialSiniestro.fechaHora ? new Date(initialSiniestro.fechaHora).toISOString().slice(0,16) : new Date(initialSiniestro.timestamp).toISOString().slice(0,16),
                 ubicacionManual: initialSiniestro.ubicacion.manual || '',
                 lugar: initialSiniestro.ubicacion.lugar || 'Ciudad',
@@ -143,7 +166,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
             const newSiniestro: Siniestro = {
                 ...initialSiniestro, // Retain other missing properties if any
-                id: siniestroId, timestamp: initialSiniestro?.timestamp || Date.now(), fechaHora: f.fechaHora,
+                id: siniestroId, tipoEvento: f.tipoEvento, timestamp: initialSiniestro?.timestamp || Date.now(), fechaHora: f.fechaHora,
                 ubicacion: { lat: gpsPosition?.lat, lng: gpsPosition?.lng, manual: f.ubicacionManual, lugar: f.lugar },
                 conductor: { nombre: f.condNombre, legajo: f.condLegajo, interno: f.condInterno, kilometraje: f.condKm, linea: f.condLinea },
                 descripcion: { tipo: f.descTipo, resumen: f.descResumen, consecuencias: f.consecuencias, factoresCausales: f.descFactores, gravedad: f.gravedad },
@@ -194,6 +217,20 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                 {/* SECCION 1 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">1. Información General</h2>
+                    
+                    <div className="flex gap-3 mb-4">
+                        <label className={`flex-1 p-3 rounded-lg border text-center font-bold cursor-pointer transition-all ${f.tipoEvento === 'Siniestro' ? 'bg-red-900/50 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'}`}>
+                            <input type="radio" name="tipoEvento" value="Siniestro" checked={f.tipoEvento === 'Siniestro'} onChange={handleChange} className="hidden" />
+                            🚨 Es un Siniestro
+                        </label>
+                        <label className={`flex-1 p-3 rounded-lg border text-center font-bold cursor-pointer transition-all ${f.tipoEvento === 'Incidente' ? 'bg-yellow-900/50 border-yellow-500 text-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.2)]' : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'}`}>
+                            <input type="radio" name="tipoEvento" value="Incidente" checked={f.tipoEvento === 'Incidente'} onChange={handleChange} className="hidden" />
+                            ⚠️ Es un Incidente
+                        </label>
+                    </div>
+
+                    <div className="space-y-3"></div>
+                    
                     <div className="space-y-3">
                         <label className="block"><span className="text-[10px] text-gray-400 uppercase">Fecha y Hora</span><input type="datetime-local" name="fechaHora" value={f.fechaHora} onChange={handleChange} required className="w-full bg-gray-900 border border-gray-600 rounded p-3 outline-none" /></label>
                         
@@ -261,16 +298,73 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                     </div>
                 </div>
 
-                {/* SECCION 2 */}
+                  {/* SECCION 2 */}
                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
                     <h2 className="font-bold text-sky-400 mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider">2. Conductor y Unidad</h2>
+                    
                     <div className="space-y-3">
-                        <input type="text" name="condNombre" value={f.condNombre} onChange={handleChange} placeholder="Nombre y Apellido" required className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
-                        <div className="grid grid-cols-2 gap-3">
-                            <input type="text" name="condLegajo" value={f.condLegajo} onChange={handleChange} placeholder="Legajo/DNI" required className="bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
-                            <input type="text" name="condInterno" value={f.condInterno} onChange={handleChange} placeholder="Interno N°" required className="bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
+                        {/* INPUT CONDUCTOR CON AUTOCOMPLETAR */}
+                        <div>
+                            <input 
+                                type="text" 
+                                list="lista-conductores" 
+                                name="condNombre" 
+                                value={f.condNombre} 
+                                onChange={handleConductorChange} 
+                                placeholder="Nombre y Apellido (Escriba para buscar...)" 
+                                required 
+                                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" 
+                            />
+                            <datalist id="lista-conductores">
+                                {externalLists.conductores.map(c => (
+                                    <option key={c.id} value={c.nombre} />
+                                ))}
+                            </datalist>
                         </div>
-                        <input type="text" name="condLinea" value={f.condLinea} onChange={handleChange} placeholder="Línea afectada" required className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm" />
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <input type="text" name="condLegajo" value={f.condLegajo} onChange={handleChange} placeholder="Legajo/DNI" required className="bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" />
+                            
+                            {/* INPUT UNIDAD CON AUTOCOMPLETAR */}
+                            <div>
+                                <input 
+                                    type="text" 
+                                    list="lista-unidades" 
+                                    name="condInterno" 
+                                    value={f.condInterno} 
+                                    onChange={handleChange} 
+                                    placeholder="Interno N°" 
+                                    required 
+                                    className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" 
+                                />
+                                <datalist id="lista-unidades">
+                                    {/* ⚠️ Ajusta 'c.interno' si en tu BD se llama diferente */}
+                                    {externalLists.unidades.map(u => (
+                                        <option key={u.id} value={u.numero} />
+                                    ))}
+                                </datalist>
+                            </div>
+                        </div>
+
+                        {/* INPUT SERVICIO/LINEA CON AUTOCOMPLETAR */}
+                        <div>
+                            <input 
+                                type="text" 
+                                list="lista-servicios" 
+                                name="condLinea" 
+                                value={f.condLinea} 
+                                onChange={handleChange} 
+                                placeholder="Línea afectada" 
+                                required 
+                                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-sm focus:border-sky-500 outline-none" 
+                            />
+                            <datalist id="lista-servicios">
+                                {/* ⚠️ Ajusta 's.linea' si en tu BD se llama diferente */}
+                                {externalLists.servicios.map(s => (
+                                    <option key={s.id} value={s.nombre} />
+                                ))}
+                            </datalist>
+                        </div>
                     </div>
                 </div>
 
