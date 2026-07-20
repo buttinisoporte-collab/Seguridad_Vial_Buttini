@@ -177,7 +177,6 @@ const App: React.FC = () => {
 
     // Sincronizaciones DB
     useEffect(() => {
-        useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
         const prev = prevRoutesRef.current;
