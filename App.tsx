@@ -177,10 +177,13 @@ const App: React.FC = () => {
 
     // Sincronizaciones DB
     useEffect(() => {
+        useEffect(() => {
         if (isLoadingData) return;
         localStorage.setItem('routes', JSON.stringify(routes));
         const prev = prevRoutesRef.current;
+        const deleted = prev.filter(p => !routes.find(c => c.id === p.id)); // <-- Línea restaurada
         const added = routes.filter(c => !prev.find(p => p.id === c.id) || JSON.stringify(prev.find(p=>p.id===c.id)) !== JSON.stringify(c));
+        deleted.forEach(d => deleteRouteFromDB(d.id).catch(()=>{})); // <-- Línea restaurada
         added.forEach(c => saveRouteToDB(c).catch(()=>{}));
         prevRoutesRef.current = routes;
     },[routes, isLoadingData]);
