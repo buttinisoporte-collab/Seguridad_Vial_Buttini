@@ -83,18 +83,18 @@ export const SiniestrosAdmin: React.FC<SiniestrosAdminProps> = ({
                 <button onClick={onAddNewSiniestro} className="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 shadow hover:shadow-lg transition-all text-sm font-bold shrink-0"><Plus size={16} /> Cargar Evento</button>
             </div>
             
-            <div className="flex gap-2 mb-4">
-                <select value={eventosFilterTipo} onChange={e => setEventosFilterTipo(e.target.value)} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none flex-1">
+            <div className="flex gap-2 mb-4 flex-wrap">
+                <select value={eventosFilterTipo} onChange={e => setEventosFilterTipo(e.target.value)} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none flex-1 min-w-[150px]">
                     <option value="">Siniestros e Incidentes</option>
                     <option value="Siniestro">Solo Siniestros</option>
                     <option value="Incidente">Solo Incidentes</option>
                 </select>
-                <select value={eventosFilterYear} onChange={e => setEventosFilterYear(e.target.value)} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none flex-1">
-                    <option value="">Todos los años</option>
+                <select value={eventosFilterYear} onChange={e => setEventosFilterYear(e.target.value)} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none w-32">
+                    <option value="">Año</option>
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
-                <select value={eventosFilterMonth} onChange={e => setEventosFilterMonth(e.target.value)} disabled={!eventosFilterYear} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none disabled:opacity-50 flex-1">
-                    <option value="">Meses</option>
+                <select value={eventosFilterMonth} onChange={e => setEventosFilterMonth(e.target.value)} disabled={!eventosFilterYear} className="bg-gray-800 border border-gray-600 rounded p-2 text-white text-sm outline-none disabled:opacity-50 w-32">
+                    <option value="">Mes</option>
                     {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m.toString()}>{m.toString().padStart(2, '0')}</option>)}
                 </select>
             </div>
