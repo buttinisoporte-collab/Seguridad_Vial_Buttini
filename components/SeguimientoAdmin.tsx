@@ -143,14 +143,27 @@ export const SeguimientoAdmin: React.FC<SeguimientoAdminProps> = ({
     return (
         <div className="flex h-full w-full text-white print:bg-white print:text-black">
             
-            {/* CSS EXCLUSIVO PARA IMPRESIÓN DEL PDF */}
+            {/* CSS EXCLUSIVO PARA IMPRESIÓN DEL PDF (Soluciona el corte de páginas) */}
             <style dangerouslySetInnerHTML={{__html: `
                 @media print {
-                    @page { margin: 15mm; size: A4 portrait; }
-                    body * { visibility: hidden; }
-                    .print-area, .print-area * { visibility: visible; }
-                    .print-area { position: absolute; left: 0; top: 0; width: 100%; color: black !important; font-family: Arial, sans-serif !important; }
-                    .no-print { display: none !important; }
+                    @page { margin: 10mm; size: A4 portrait; }
+                    /* Ocultar elementos de la interfaz de la app */
+                    .no-print, header, aside { display: none !important; }
+                    /* Desbloquear alturas y scrolls para permitir varias páginas */
+                    html, body, #root, div {
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        position: static !important;
+                    }
+                    /* Estilos del reporte */
+                    .print-area {
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        color: black !important;
+                    }
                     .print-border { border: 1px solid black !important; }
                     .print-bg { background-color: #e5e7eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
@@ -186,15 +199,17 @@ export const SeguimientoAdmin: React.FC<SeguimientoAdminProps> = ({
                         <thead>
                             <tr className="bg-gray-900 border-b border-gray-700 text-[9px] uppercase tracking-wider text-gray-400 sticky top-0 z-10">
                                 <th className="p-2 w-[12%] font-bold">Fecha</th>
-                                <th className="p-2 w-[18%] font-bold">Línea/Int.</th>
-                                <th className="p-2 w-[25%] font-bold">Conductor</th>
+                                <th className="p-2 w-[10%] font-bold text-center">Tipo</th>
+                                <th className="p-2 w-[15%] font-bold">Línea/Int.</th>
+                                <th className="p-2 w-[23%] font-bold">Conductor</th>
                                 <th className="p-2 w-[15%] font-bold text-center">Estado</th>
-                                <th className="p-2 w-[20%] font-bold text-center">Investigación</th>
+                                <th className="p-2 w-[15%] font-bold text-center">Inv.</th>
                                 <th className="p-2 w-[10%] font-bold text-center">CRM</th>
                             </tr>
                         </thead>
                         <tbody className="text-[11px] divide-y divide-gray-700/50">
                             {filteredList.map(sin => {
+                                const isIncidente = sin.tipoEvento === 'Incidente';
                                 const invData = sin.investigacion || {};
                                 const estCrm = invData.estadoReclamo || 'Pendiente';
                                 const estInv = invData.estadoInvestigacion || 'Pendiente';
@@ -206,6 +221,7 @@ export const SeguimientoAdmin: React.FC<SeguimientoAdminProps> = ({
                                 return (
                                     <tr key={sin.id} className={`transition-colors hover:bg-gray-700/50 ${selectedSin?.id === sin.id ? 'bg-emerald-900/30' : ''}`}>
                                         <td className="p-2 text-gray-300 truncate" onClick={() => handleSelectRow(sin.id, 'crm')}>{new Date(sin.fechaHora).toLocaleDateString('es-AR')}</td>
+                                        <td className="p-2 text-center" onClick={() => handleSelectRow(sin.id, 'crm')}><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${isIncidente ? 'bg-yellow-500 text-black' : 'bg-red-600 text-white'}`}>{isIncidente ? 'INC' : 'SIN'}</span></td>
                                         <td className="p-2 text-gray-300 truncate" onClick={() => handleSelectRow(sin.id, 'crm')} title={`${sin.conductor?.linea} (Int: ${sin.conductor?.interno})`}>{sin.conductor?.interno || sin.conductor?.linea || '-'}</td>
                                         <td className="p-2 text-gray-300 truncate" onClick={() => handleSelectRow(sin.id, 'crm')} title={sin.conductor?.nombre}>{sin.conductor?.nombre || '-'}</td>
                                         <td className="p-2 text-center" onClick={() => handleSelectRow(sin.id, 'crm')}><span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${estCrm === 'Cerrado' ? 'bg-green-900/50 text-green-400' : estCrm === 'Legales' ? 'bg-orange-900/50 text-orange-400' : 'bg-gray-700 text-gray-300'}`}>{estCrm}</span></td>
