@@ -73,33 +73,6 @@ export interface InvestigacionData {
     abonado?: string;
     linkVideoCamara?: string;
     victimasDetalle?: VictimaDetalle[];
-}export interface InvestigacionData {
-    // Campos CRM
-    zona?: string; numeroSiniestro?: string; grupo?: string; tipoServicio?: string; dominio?: string;
-    sectorDanado?: string; accionCorrectiva?: string; presentoReclamo?: string;
-    ampliacionDeclaracion?: string; ampliacionLugar?: string; estadoAmd?: string; estadoJudicial?: string;
-    responsabilidadFinal?: string; responsabilidadCsv?: string; franquicia?: string;
-    seguroTercero?: string; ofrecimiento?: string; pretension?: string; estadoReclamo?: string;
-    abonado?: string; linkVideoCamara?: string; victimasDetalle?: VictimaDetalle[];
-    
-    // Campos INFORME INVESTIGACION (R-CH-Ad-08-02)
-    estadoInvestigacion?: 'Pendiente' | 'En Curso' | 'Finalizada';
-    antiguedadEmpresa?: string;
-    pasajerosBordo?: string;
-    danosMateriales?: string;
-    notiAsegFecha?: string;
-    notiAsegHora?: string;
-    evidencias?: string[]; // 'Fotografías', 'Croquis', 'Videos', 'Registro GPS/Tacógrafo', 'Declaraciones de testigos', 'Informe técnico del vehículo', 'Otro'
-    evidenciaOtro?: string;
-    causaTipo?: string;
-    causaDescripcion?: string;
-    causaInmediata?: string;
-    causaRaiz?: string;
-    metodoCausa?: string; // '5 Porqués', 'Ishikawa', '5M', 'Otro'
-    metodoOtro?: string;
-    conclusiones?: string;
-    correspondeAccion?: string; // 'Si', 'No'
-    nroAccion?: string;
 }
 
 export interface Siniestro {
