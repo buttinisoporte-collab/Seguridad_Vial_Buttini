@@ -103,4 +103,4 @@ export interface Route {
     id: string; name: string; origin: string; destination: string; group: string; line: string; service: string; 
     geoJson: RouteGeoJSON; geoJsonUrl?: string; isPublic?: boolean; 
 }
-export interface User { id: string; name: string; username: string; pin: string; isAdmin: boolean; isDriver?: boolean; allowedTabs: AppTab[]; }
+export interface User { id: string; name: string; username: string; pin: string; isAdmin: boolean; isDriver?: boolean; allowedTabs: AppTab[];mustChangePassword?: boolean; }

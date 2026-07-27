@@ -149,12 +149,12 @@ export const deleteRiskTypeFromDB = async (id: string) => { await supabase.from(
 // USUARIOS (USERS)
 // ==========================================================
 export const saveUserToDB = async (u: User) => {
-    await supabase.from('users').upsert({ id: u.id, name: u.name, username: u.username, pin: u.pin, is_admin: u.isAdmin, is_driver: u.isDriver, allowed_tabs: u.allowedTabs });
+    await supabase.from('users').upsert({ id: u.id, name: u.name, username: u.username, pin: u.pin, is_admin: u.isAdmin, is_driver: u.isDriver, allowed_tabs: u.allowedTabs, must_change_password: u.mustChangePassword || false });
 };
 
 export const loadUsersFromDB = async (): Promise<User[]> => {
     const { data } = await supabase.from('users').select('*');
-    return (data || []).map(u => ({ id: u.id, name: u.name, username: u.username, pin: u.pin, isAdmin: u.is_admin, isDriver: u.is_driver, allowedTabs: u.allowed_tabs }));
+    return (data || []).map(u => ({ id: u.id, name: u.name, username: u.username, pin: u.pin, isAdmin: u.is_admin, isDriver: u.is_driver, allowedTabs: u.allowed_tabs, mustChangePassword: u.must_change_password }));
 };
 
 export const deleteUserFromDB = async (id: string) => { await supabase.from('users').delete().eq('id', id); };
@@ -250,4 +250,21 @@ export const loadMetricasAnualesFromDB = async (year: string): Promise<MetricasM
         objKms570: d.obj_kms_570, objKmsUrbano570: d.obj_kms_urbano_570,
         objKmsMedia570: d.obj_kms_media_570, objKmsLarga570: d.obj_kms_larga_570
     }));
+};
+
+// ==========================================================
+// AJUSTES GLOBALES (LOGO Y COLORES)
+// ==========================================================
+export const saveSettingsToDB = async (logo: string, colors: Record<string, string>) => {
+    await supabase.from('app_settings').upsert({ 
+        id: 'global', 
+        company_logo: logo, 
+        group_colors: colors 
+    });
+};
+
+export const loadSettingsFromDB = async () => {
+    const { data, error } = await supabase.from('app_settings').select('*').eq('id', 'global').single();
+    if (error || !data) return null;
+    return { logo: data.company_logo, colors: data.group_colors };
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { PlusCircle, Trash2, Edit, Shield, Bus, MonitorSmartphone, Search } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Shield, Bus, MonitorSmartphone, Search, Key } from 'lucide-react';
 import type { User, AppTab } from '../types';
 
 interface UserManagerProps {
@@ -43,7 +43,7 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
             if (users.find(u => u.username.toLowerCase() === username.toLowerCase() && (u.isDriver === isDriv))) {
                 return alert(`El ${isDriv ? 'legajo' : 'nombre de usuario'} ya existe para este rol.`);
             }
-            setUsers([...users, { id: uuidv4(), name, username, pin, isAdmin: isAdm, isDriver: isDriv, allowedTabs: finalTabs }]);
+            setUsers([...users, { id: uuidv4(), name, username, pin, isAdmin: isAdm, isDriver: isDriv, allowedTabs: finalTabs, mustChangePassword: true  }]);
         }
         resetForm();
     };
@@ -56,6 +56,11 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
     const handleDelete = (id: string) => {
         if (id === currentUser.id) return alert("No puedes eliminar tu propio usuario.");
         if (window.confirm("¿Eliminar este usuario?")) setUsers(users.filter(u => u.id !== id));
+    };
+    const handleResetPin = (id: string) => {
+        if (window.confirm("¿Restablecer contraseña a '1234'? El usuario deberá cambiarla obligatoriamente al ingresar.")) {
+            setUsers(users.map(u => u.id === id ? { ...u, pin: '1234', mustChangePassword: true } : u));
+        }
     };
 
     const resetForm = () => {
@@ -160,9 +165,10 @@ export const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, curre
                             <p className="text-xs text-gray-400">{u.isDriver ? 'Legajo:' : 'Usuario:'} <b>{u.username}</b> • PIN: {u.pin}</p>
                             {!u.isAdmin && !u.isDriver && <p className="text-[10px] text-gray-500 mt-1">Permisos: {(u.allowedTabs||[]).join(', ')}</p>}
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => handleEdit(u)} className="text-yellow-400 hover:text-yellow-300"><Edit size={16}/></button>
-                            {u.id !== currentUser.id && <button onClick={() => handleDelete(u.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16}/></button>}
+                        <div className="flex gap-3">
+                            <button onClick={() => handleResetPin(u.id)} className="text-sky-400 hover:text-sky-300" title="Resetear Clave"><Key size={16}/></button>
+                            <button onClick={() => handleEdit(u)} className="text-yellow-400 hover:text-yellow-300" title="Editar"><Edit size={16}/></button>
+                            {u.id !== currentUser.id && <button onClick={() => handleDelete(u.id)} className="text-red-400 hover:text-red-300" title="Eliminar"><Trash2 size={16}/></button>}
                         </div>
                     </div>
                 ))}

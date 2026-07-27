@@ -20,7 +20,8 @@ import {
     saveRiskToDB, loadRisksFromDB, deleteRiskFromDB,
     saveRiskTypeToDB, loadRiskTypesFromDB, deleteRiskTypeFromDB,
     saveUserToDB, loadUsersFromDB, deleteUserFromDB,
-    saveSiniestroToDB, loadSiniestrosFromDB, deleteSiniestroFromDB
+    saveSiniestroToDB, loadSiniestrosFromDB, deleteSiniestroFromDB,
+    saveSettingsToDB, loadSettingsFromDB
 } from './lib/supabase';
 
 const SAN_RAFAEL_CENTER: LatLngExpression =[-34.6175, -68.335];
@@ -117,8 +118,12 @@ const App: React.FC = () => {
 
     useEffect(() => { localStorage.setItem('tg_token', telegramToken); },[telegramToken]);
     useEffect(() => { localStorage.setItem('tg_chat', telegramChatId); },[telegramChatId]);
-    useEffect(() => { localStorage.setItem('groupColors', JSON.stringify(groupColors)); },[groupColors]);
-    useEffect(() => { localStorage.setItem('companyLogo', companyLogo); },[companyLogo]);
+    useEffect(() => { 
+        if (isLoadingData) return;
+        localStorage.setItem('groupColors', JSON.stringify(groupColors)); 
+        localStorage.setItem('companyLogo', companyLogo);
+        saveSettingsToDB(companyLogo, groupColors).catch(()=>{}); 
+    }, [groupColors, companyLogo, isLoadingData]);
 
     const[isAddRiskModalOpen, setIsAddRiskModalOpen] = useState<boolean>(false);
     const[editingRisk, setEditingRisk] = useState<Risk | null>(null);
@@ -145,7 +150,7 @@ const App: React.FC = () => {
         const initData = async () => {
             setIsLoadingData(true);
             try {
-                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers, dbSiniestros] = await Promise.all([ loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB(), loadSiniestrosFromDB() ]);
+                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers, dbSiniestros, dbSettings] = await Promise.all([ loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB(), loadSiniestrosFromDB(, loadSettingsFromDB()  ]);
                 setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
                 setRisks(Array.isArray(dbRisks) ? dbRisks :[]); prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
                 setSiniestros(Array.isArray(dbSiniestros) ? dbSiniestros :[]); prevSiniestrosRef.current = Array.isArray(dbSiniestros) ? dbSiniestros :[];
@@ -164,6 +169,14 @@ const App: React.FC = () => {
                     const defaultAdmin: User = { id: uuidv4(), name: 'Administrador Principal', username: 'admin', pin: '1234', isAdmin: true, allowedTabs:['routes', 'riskTypes', 'reports', 'riskViewer', 'settings', 'users', 'novedades', 'siniestros', 'seguimiento'] };
                     setUsers([defaultAdmin]); saveUserToDB(defaultAdmin).catch(()=>{}); prevUsersRef.current =[defaultAdmin];
                 }
+
+                // 👇 AQUI PEGAMOS LA CARGA DE LOGO Y COLORES 👇
+                if (dbSettings) {
+                    if (dbSettings.logo) setCompanyLogo(dbSettings.logo);
+                    if (dbSettings.colors) setGroupColors(dbSettings.colors);
+                }
+                // 👆 FIN DEL CÓDIGO NUEVO 👆
+
             } catch (err) {
                 console.warn("Usando Modo Local.", err);
                 setRoutes(Array.isArray(JSON.parse(localStorage.getItem('routes') || '[]')) ? JSON.parse(localStorage.getItem('routes') || '[]') :[]);
@@ -239,7 +252,28 @@ const App: React.FC = () => {
 
     useEffect(() => { setIsAddRiskModalOpen(false); setNewRiskPosition(null); setEditingRisk(null); setIsAddSiniestroModalOpen(false); setNewSiniestroPosition(null); },[activeTab]);
 
-    const handleLogin = useCallback((user: User) => { setCurrentUser(user); localStorage.setItem('currentUser', JSON.stringify(user)); if (user.isAdmin) setActiveTab('routes'); else if (Array.isArray(user.allowedTabs) && user.allowedTabs.length > 0) setActiveTab(user.allowedTabs[0]); },[]);
+    const handleLogin = useCallback((user: User) => {
+        let finalUser = user;
+        
+        // Exigir cambio de clave si es la primera vez (pin=1234) o si fue reseteado
+        if (user.mustChangePassword || user.pin === '1234') {
+            const newPin = window.prompt("⚠️ POR SEGURIDAD: Debe cambiar su contraseña provisoria para continuar.\n\nIngrese su nueva contraseña:");
+            if (!newPin || newPin.trim() === '' || newPin === user.pin) {
+                alert("Operación cancelada. Debe ingresar una contraseña válida y diferente.");
+                return; // Detiene el login
+            }
+            finalUser = { ...user, pin: newPin.trim(), mustChangePassword: false };
+            setUsers(prev => prev.map(u => u.id === finalUser.id ? finalUser : u));
+            saveUserToDB(finalUser).catch(()=>{}); // Guardamos inmediatamente en Supabase
+            alert("¡Contraseña actualizada exitosamente!");
+        }
+
+        setCurrentUser(finalUser); 
+        localStorage.setItem('currentUser', JSON.stringify(finalUser)); 
+        
+        if (finalUser.isAdmin) setActiveTab('routes'); 
+        else if (Array.isArray(finalUser.allowedTabs) && finalUser.allowedTabs.length > 0) setActiveTab(finalUser.allowedTabs[0]); 
+    }, []);
     const handleLogout = useCallback(() => { setCurrentUser(null); localStorage.removeItem('currentUser'); },[]);
 
     const findAssociatedRouteIds = useCallback((position: Position): string[] => {
