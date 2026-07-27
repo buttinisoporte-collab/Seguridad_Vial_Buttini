@@ -150,7 +150,7 @@ const App: React.FC = () => {
         const initData = async () => {
             setIsLoadingData(true);
             try {
-                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers, dbSiniestros, dbSettings] = await Promise.all([ loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB(), loadSiniestrosFromDB(, loadSettingsFromDB()  ]);
+                const[dbRoutes, dbRisks, dbRiskTypes, dbUsers, dbSiniestros, dbSettings] = await Promise.all([ loadRoutesFromDB(), loadRisksFromDB(), loadRiskTypesFromDB(), loadUsersFromDB(), loadSiniestrosFromDB(), loadSettingsFromDB() ]);
                 setRoutes(Array.isArray(dbRoutes) ? dbRoutes :[]); prevRoutesRef.current = Array.isArray(dbRoutes) ? dbRoutes :[];
                 setRisks(Array.isArray(dbRisks) ? dbRisks :[]); prevRisksRef.current = Array.isArray(dbRisks) ? dbRisks :[];
                 setSiniestros(Array.isArray(dbSiniestros) ? dbSiniestros :[]); prevSiniestrosRef.current = Array.isArray(dbSiniestros) ? dbSiniestros :[];
