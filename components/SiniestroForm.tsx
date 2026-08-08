@@ -454,7 +454,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                         <p className="text-[11px] text-gray-400 mb-4 italic">Suba fotos de: daños propios, daños terceros, posición de vehículos (TOME FOTOS PANORÁMICAS) y documentos (TOME FOTOS ENFOCADAS Y CLARAS).</p>
                         <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors bg-gray-900/50">
                             <div className="flex flex-col items-center justify-center pt-5 pb-6"><Camera size={32} className="text-sky-500 mb-2" /><p className="text-sm text-gray-400 font-bold">Tomar Foto o Abrir Galería</p></div>
-                            <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileSelect} />
+                            <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
                         </label>
                         {selectedFiles.length > 0 && (
                             <div className="mt-4 grid grid-cols-2 gap-2">
