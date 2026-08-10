@@ -150,7 +150,8 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
 
     const handleVictimInicialChange = (id: string, tipo: string, field: 'nombre' | 'dni', value: string) => {
         setF(prev => {
-            const current = [...prev.victimasIniciales];
+            // Salvavidas: si victimasIniciales es indefinido, crea un array vacío
+            const current = [...(prev.victimasIniciales || [])]; 
             const index = current.findIndex(v => v.id === id);
             if (index >= 0) current[index] = { ...current[index], [field]: value };
             else current.push({ id, tipo, nombre: field === 'nombre' ? value : '', dni: field === 'dni' ? value : '' });
