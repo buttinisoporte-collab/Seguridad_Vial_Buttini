@@ -45,7 +45,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
         consecuencias: JSON.parse(JSON.stringify(CONSECUENCIAS_DEFAULT)) as Consecuencia[], 
         descFactores: 'Factor Humano (error, descripción, velocidad)', gravedad: 'Leve',
         tercInvolucrado: false, tercNombre: '', tercDNI: '', tercVehiculo: '', tercPatente: '', tercSeguro: '', tercPoliza: '',
-        intervencionPolicial: false, hayTestigos: false, testigosInfo: '', driveUrl: ''
+        intervencionPolicial: false, hayTestigos: false, testigosInfo: '', driveUrl: '', victimasIniciales: [] as { id: string; tipo: string; nombre: string; dni: string; }[] 
     });
 
     // Estado para guardar los datos de la BD externa
@@ -146,6 +146,16 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
         const newCons =[...f.consecuencias];
         newCons[index] = { ...newCons[index],[field]: value };
         setF({ ...f, consecuencias: newCons });
+    };
+
+    const handleVictimInicialChange = (id: string, tipo: string, field: 'nombre' | 'dni', value: string) => {
+        setF(prev => {
+            const current = [...prev.victimasIniciales];
+            const index = current.findIndex(v => v.id === id);
+            if (index >= 0) current[index] = { ...current[index], [field]: value };
+            else current.push({ id, tipo, nombre: field === 'nombre' ? value : '', dni: field === 'dni' ? value : '' });
+            return { ...prev, victimasIniciales: current };
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -402,6 +412,28 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                                 )}
                             </div>
                         ))}
+                        {/* NUEVO: CAMPOS DINÁMICOS DE VÍCTIMAS INICIALES */}
+                        {f.consecuencias.some(c => c.activa && c.tipo !== 'Solo daños materiales' && parseInt(c.cantidad) > 0) && (
+                            <div className="mt-4 mb-4 pt-4 border-t border-gray-700">
+                                <p className="text-[10px] text-red-400 uppercase font-bold mb-3">Detalle de Personas Afectadas</p>
+                                {f.consecuencias.filter(c => c.activa && c.tipo !== 'Solo daños materiales' && parseInt(c.cantidad) > 0).map(c => {
+                                    const count = parseInt(c.cantidad) || 0;
+                                    return Array.from({ length: count }).map((_, i) => {
+                                        const vId = `${c.tipo}-${i}`;
+                                        const existing = f.victimasIniciales.find(v => v.id === vId) || { id: vId, tipo: c.tipo, nombre: '', dni: '' };
+                                        return (
+                                            <div key={vId} className="bg-gray-900 p-3 rounded mb-2 border border-red-900/50">
+                                                <p className="text-[11px] text-red-300 font-bold mb-2 uppercase">{c.tipo} ({i + 1} de {count})</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input type="text" placeholder="Nombre y Apellido" value={existing.nombre} onChange={e => handleVictimInicialChange(vId, c.tipo, 'nombre', e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-xs text-white outline-none focus:border-sky-500" />
+                                                    <input type="text" placeholder="DNI" value={existing.dni} onChange={e => handleVictimInicialChange(vId, c.tipo, 'dni', e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded p-2 text-xs text-white outline-none focus:border-sky-500" />
+                                                </div>
+                                            </div>
+                                        )
+                                    })
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Factores Causales</p>

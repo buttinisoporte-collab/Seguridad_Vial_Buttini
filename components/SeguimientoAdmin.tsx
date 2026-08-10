@@ -267,6 +267,22 @@ export const SeguimientoAdmin: React.FC<SeguimientoAdminProps> = ({
 
                                 <div className="bg-gray-900 p-5 rounded-xl border border-gray-700 mb-6 text-sm shadow-lg">
                                     <h4 className="text-gray-400 font-bold mb-3 border-b border-gray-700 pb-1 uppercase text-xs tracking-wider flex justify-between"><span>Relevamiento Inicial con el Formulario</span> <span className="text-[10px] text-gray-500 font-normal">Solo Lectura</span></h4>
+                                    <div className="col-span-2 lg:col-span-4"><p className="text-[10px] text-gray-500 uppercase">Factores Causales Indicados</p><p className="font-bold">{selectedSin.descripcion?.factoresCausales || '-'}</p></div>
+                                
+                                    {/* NUEVO: VÍCTIMAS CARGADAS EN EL FORMULARIO INICIAL */}
+                                    {Array.isArray(selectedSin.victimasIniciales) && selectedSin.victimasIniciales.length > 0 && (
+                                        <div className="col-span-2 lg:col-span-4 mt-2 border-t border-gray-800 pt-3">
+                                            <p className="text-[10px] text-red-400 uppercase font-bold mb-2">Personas Afectadas (Cargadas en Relevamiento Inicial)</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                {selectedSin.victimasIniciales.map((v, i) => (
+                                                    <div key={i} className="bg-black p-2.5 rounded border border-red-900/30">
+                                                        <p className="text-[10px] text-red-400 font-bold uppercase mb-1">{v.tipo}</p>
+                                                        <p className="text-xs text-white font-bold">{v.nombre || 'Sin nombre'} <span className="text-gray-400 font-normal">{v.dni ? `| DNI: ${v.dni}` : ''}</span></p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-gray-300 mb-4">
                                         <div><p className="text-[10px] text-gray-500 uppercase">Conductor</p><p className="font-bold text-white">{selectedSin.conductor?.nombre || '-'}</p></div>
                                         <div><p className="text-[10px] text-gray-500 uppercase">Legajo / DNI</p><p className="font-bold text-white">{selectedSin.conductor?.legajo || '-'}</p></div>

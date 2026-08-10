@@ -103,4 +103,18 @@ export interface Route {
     id: string; name: string; origin: string; destination: string; group: string; line: string; service: string; 
     geoJson: RouteGeoJSON; geoJsonUrl?: string; isPublic?: boolean; 
 }
+
 export interface User { id: string; name: string; username: string; pin: string; isAdmin: boolean; isDriver?: boolean; allowedTabs: AppTab[];mustChangePassword?: boolean; }
+export interface VictimaInicial {
+    id: string;
+    tipo: string;
+    nombre: string;
+    dni: string;
+}
+
+export interface Siniestro {
+    id: string;
+    // ... tus otros campos ...
+    investigacion?: InvestigacionData;
+    victimasIniciales?: VictimaInicial[]; // <--- AGREGA ESTA LÍNEA
+}

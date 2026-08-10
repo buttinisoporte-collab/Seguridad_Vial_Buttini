@@ -176,7 +176,8 @@ export const saveSiniestroToDB = async (sin: Siniestro) => {
         images: sin.images, 
         drive_url: sin.driveUrl, 
         associated_route_id: sin.associatedRouteId,
-        investigacion: sin.investigacion
+        investigacion: sin.investigacion,
+        victimas_iniciales: sin.victimasIniciales
     });
 };
 
