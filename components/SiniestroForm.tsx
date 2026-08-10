@@ -420,7 +420,7 @@ export const SiniestroForm: React.FC<SiniestroFormProps> = ({ onSaveSiniestro, i
                                     const count = parseInt(c.cantidad) || 0;
                                     return Array.from({ length: count }).map((_, i) => {
                                         const vId = `${c.tipo}-${i}`;
-                                        const existing = f.victimasIniciales.find(v => v.id === vId) || { id: vId, tipo: c.tipo, nombre: '', dni: '' };
+                                        const existing = (f.victimasIniciales || []).find(v => v.id === vId) || { id: vId, tipo: c.tipo, nombre: '', dni: '' };
                                         return (
                                             <div key={vId} className="bg-gray-900 p-3 rounded mb-2 border border-red-900/50">
                                                 <p className="text-[11px] text-red-300 font-bold mb-2 uppercase">{c.tipo} ({i + 1} de {count})</p>
