@@ -114,7 +114,7 @@ export const Panel: React.FC<PanelProps> = ({
         }
     };
 
-    const isFullScreenTab = activeTab === 'seguimiento' || activeTab === 'indicadores';
+    const isFullScreenTab = activeTab === 'seguimiento' || activeTab === 'indicadores' || activeTab === 'users';
 
     return (
         <div className="flex flex-col h-screen w-screen bg-slate-100 font-sans overflow-hidden">
