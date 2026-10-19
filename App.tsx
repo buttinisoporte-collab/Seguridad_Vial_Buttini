@@ -104,8 +104,10 @@ const App: React.FC = () => {
     const[telegramToken, setTelegramToken] = useState(() => localStorage.getItem('tg_token') || '');
     const[telegramChatId, setTelegramChatId] = useState(() => localStorage.getItem('tg_chat') || '');
     const[groupColors, setGroupColors] = useState<Record<string, string>>(() => JSON.parse(localStorage.getItem('groupColors') || '{}'));
-
-    const[novedadesFilterDate, setNovedadesFilterDate] = useState('');
+    
+    const[novedadesFilterYear, setNovedadesFilterYear] = useState(new Date().getFullYear().toString());
+    const[novedadesFilterMonth, setNovedadesFilterMonth] = useState('');
+    const[novedadesFilterGroup, setNovedadesFilterGroup] = useState('');
     const[novedadesFilterLine, setNovedadesFilterLine] = useState('');
     const[showNovedadesRoutes, setShowNovedadesRoutes] = useState(true);
     const[showRiskTypesRoutes, setShowRiskTypesRoutes] = useState(true);
@@ -356,13 +358,28 @@ const App: React.FC = () => {
         if (activeTab === 'novedades') {
             if (!risk.driverReportDetails) return false;
             if (novedadesFilterLine && !risk.driverReportDetails.linea.toLowerCase().includes(novedadesFilterLine.toLowerCase())) return false;
-            if (novedadesFilterDate && risk.timestamp && new Date(risk.timestamp).toISOString().split('T')[0] !== novedadesFilterDate) return false;
+            
+            if (novedadesFilterYear) {
+                if (!risk.timestamp) return false;
+                const rDate = new Date(risk.timestamp);
+                if (rDate.getFullYear().toString() !== novedadesFilterYear) return false;
+                if (novedadesFilterMonth && (rDate.getMonth() + 1).toString() !== novedadesFilterMonth) return false;
+            }
+            
+            if (novedadesFilterGroup) {
+                const hasGroup = (risk.associatedRouteIds || []).some(routeId => {
+                    const route = routes.find(r => r.id === routeId);
+                    return route?.group === novedadesFilterGroup;
+                });
+                if (!hasGroup) return false;
+            }
+
             return true;
         }
         if (activeTab === 'routes') { if (rt.isIncident && !showIncidents) return false; if (!rt.isIncident && !showRisks) return false; }
         if (risk.driverReportDetails && risk.timestamp && ((Date.now() - risk.timestamp) / 3600000) > driverReportTTL) return false;
         return true;
-    }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL, activeTab, novedadesFilterLine, novedadesFilterDate]);
+    }) : [],[risks, getRiskType, showRisks, showIncidents, driverReportTTL, activeTab, novedadesFilterLine, novedadesFilterYear, novedadesFilterMonth, novedadesFilterGroup, routes]);
 
     // MAPEO EXCLUSIVO PARA EL MAPA DE SINIESTROS E INCIDENTES
     const visibleSiniestros = useMemo(() => {
@@ -448,7 +465,9 @@ const App: React.FC = () => {
                 onUpdateRisk={(updatedRisk) => { setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r)); }}
                 onUpdateSiniestro={(updatedSin) => { setSiniestros(prev => prev.map(s => s.id === updatedSin.id ? updatedSin : s)); }}
                 groupColors={groupColors} setGroupColors={setGroupColors}
-                novedadesFilterDate={novedadesFilterDate} setNovedadesFilterDate={setNovedadesFilterDate}
+                novedadesFilterYear={novedadesFilterYear} setNovedadesFilterYear={setNovedadesFilterYear}
+                novedadesFilterMonth={novedadesFilterMonth} setNovedadesFilterMonth={setNovedadesFilterMonth}
+                novedadesFilterGroup={novedadesFilterGroup} setNovedadesFilterGroup={setNovedadesFilterGroup}
                 companyLogo={companyLogo} setCompanyLogo={setCompanyLogo}
                 novedadesFilterLine={novedadesFilterLine} setNovedadesFilterLine={setNovedadesFilterLine}
                 showNovedadesRoutes={showNovedadesRoutes} setShowNovedadesRoutes={setShowNovedadesRoutes}
