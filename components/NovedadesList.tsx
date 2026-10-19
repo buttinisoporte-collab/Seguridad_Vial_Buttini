@@ -15,7 +15,7 @@ interface NovedadesListProps {
 }
 
 export const NovedadesList: React.FC<NovedadesListProps> = ({ 
-    risks, currentUser, onFocusPosition, onUpdateRisk, handleDeleteRisk,
+    risks, routes, currentUser, onFocusPosition, onUpdateRisk, handleDeleteRisk,
     novedadesFilterYear, setNovedadesFilterYear, novedadesFilterMonth, setNovedadesFilterMonth, novedadesFilterGroup, setNovedadesFilterGroup, novedadesFilterLine, setNovedadesFilterLine,
     showNovedadesRoutes, setShowNovedadesRoutes
 }) => {
