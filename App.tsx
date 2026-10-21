@@ -311,9 +311,14 @@ const App: React.FC = () => {
             }
             const targetRisk = risks.find(r => r.id === relocatingSiniestroId);
             if (targetRisk) {
-                const updatedRisk = { ...targetRisk, position: { lat: latlng.lat, lng: latlng.lng } };
+                const newPos = { lat: latlng.lat, lng: latlng.lng };
+                const updatedRisk = { 
+                    ...targetRisk, 
+                    position: newPos,
+                    associatedRouteIds: findAssociatedRouteIds(newPos) 
+                };
                 setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r));
-                saveRiskToDB(updatedRisk).catch(()=>{}); setRelocatingSiniestroId(null); setFocusPosition({ lat: latlng.lat, lng: latlng.lng });
+                saveRiskToDB(updatedRisk).catch(()=>{}); setRelocatingSiniestroId(null); setFocusPosition(newPos);
                 return;
             }
             setRelocatingSiniestroId(null); return;
