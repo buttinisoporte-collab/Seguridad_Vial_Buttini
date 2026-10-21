@@ -485,7 +485,7 @@ const App: React.FC = () => {
                     <MapFocusUpdater focusPosition={focusPosition} />
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
                     <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={visibleSiniestros} activeTab={activeTab} focusPosition={focusPosition} />
-                    {(ac{(activeTab === 'riskTypes' || activeTab === 'siniestros' || activeTab === 'novedades') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}tiveTab === 'riskTypes' || activeTab === 'siniestros') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}
+                    {(activeTab === 'riskTypes' || activeTab === 'siniestros' || activeTab === 'novedades') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}
 
                     {Array.isArray(visibleRoutes) && visibleRoutes.map(route => {
                         const path: LatLngExpression[][] =[];
