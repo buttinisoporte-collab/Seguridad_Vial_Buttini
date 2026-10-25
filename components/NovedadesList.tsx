@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { Risk, Position, User, Route } from '../types';
-import { Bus, MapPin, Search, Calendar, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Bus, MapPin, Search, Calendar, Eye, EyeOff, Trash2, Crosshair } from 'lucide-react';
 
 interface NovedadesListProps {
     risks: Risk[]; routes: Route[]; currentUser: User;
@@ -12,12 +12,14 @@ interface NovedadesListProps {
     novedadesFilterGroup: string; setNovedadesFilterGroup: (v: string) => void;
     novedadesFilterLine: string; setNovedadesFilterLine: (v: string) => void;
     showNovedadesRoutes: boolean; setShowNovedadesRoutes: (v: boolean) => void;
+    relocatingSiniestroId: string | null; setRelocatingSiniestroId: (v: string | null) => void;
 }
 
 export const NovedadesList: React.FC<NovedadesListProps> = ({ 
     risks, routes, currentUser, onFocusPosition, onUpdateRisk, handleDeleteRisk,
-    novedadesFilterYear, setNovedadesFilterYear, novedadesFilterMonth, setNovedadesFilterMonth, novedadesFilterGroup, setNovedadesFilterGroup, novedadesFilterLine, setNovedadesFilterLine,
-    showNovedadesRoutes, setShowNovedadesRoutes
+    novedadesFilterYear, setNovedadesFilterYear, novedadesFilterMonth, setNovedadesFilterMonth,
+    novedadesFilterGroup, setNovedadesFilterGroup, novedadesFilterLine, setNovedadesFilterLine,
+    showNovedadesRoutes, setShowNovedadesRoutes, relocatingSiniestroId, setRelocatingSiniestroId
 }) => {
     const uniqueGroups = useMemo(() => Array.from(new Set(routes.map(r => r.group).filter(Boolean))).sort(), [routes]);
     const years = Array.from({ length: new Date().getFullYear() - 2020 + 2 }, (_, i) => (2020 + i).toString());
@@ -100,9 +102,16 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
                     const date = nov.timestamp ? new Date(nov.timestamp).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
                     return (
                         <div key={nov.id} onClick={() => onFocusPosition(nov.position)} className={`bg-gray-800 border ${isVisible ? 'border-gray-700 hover:border-sky-500' : 'border-dashed border-gray-600 opacity-60'} rounded-lg p-3 cursor-pointer relative group transition-colors`}>
-                            <div className="absolute top-3 right-3 flex gap-2">
-                                <button onClick={(e) => toggleVisibility(e, nov)} className={`p-1.5 rounded-md transition-colors ${isVisible ? 'text-sky-400 bg-sky-900/30' : 'text-gray-500 bg-gray-900'}`}>{isVisible ? <Eye size={16}/> : <EyeOff size={16}/>}</button>
-                                {currentUser.isAdmin && <button onClick={(e) => { e.stopPropagation(); handleDeleteRisk(nov.id); }} className="p-1.5 text-red-500 hover:bg-red-900/20 rounded-md"><Trash2 size={16} /></button>}
+                            <div className="absolute top-3 right-3 flex flex-col items-end gap-2">
+                                <div className="flex gap-2">
+                                    <button onClick={(e) => toggleVisibility(e, nov)} className={`p-1.5 rounded-md transition-colors ${isVisible ? 'text-sky-400 bg-sky-900/30' : 'text-gray-500 bg-gray-900'}`}>{isVisible ? <Eye size={16}/> : <EyeOff size={16}/>}</button>
+                                    {currentUser.isAdmin && <button onClick={(e) => { e.stopPropagation(); handleDeleteRisk(nov.id); }} className="p-1.5 text-red-500 hover:bg-red-900/20 rounded-md"><Trash2 size={16} /></button>}
+                                </div>
+                                {(!currentUser.isDriver || currentUser.isAdmin) && (
+                                    <button onClick={(e) => { e.stopPropagation(); setRelocatingSiniestroId(relocatingSiniestroId === nov.id ? null : nov.id); }} className={`p-1.5 rounded-md transition-colors ${relocatingSiniestroId === nov.id ? 'bg-sky-600 text-white animate-pulse' : 'text-sky-400 bg-gray-900 hover:bg-gray-700'}`} title={relocatingSiniestroId === nov.id ? 'Haga clic en el mapa para reubicar' : 'Reubicar Punto GPS'}>
+                                        <Crosshair size={16} />
+                                    </button>
+                                )}
                             </div>
                             <div className="pr-16"><div className="flex justify-between items-start mb-1"><p className="text-[10px] text-sky-400 font-bold uppercase">{d.categoriaIRAM}</p><span className="text-[10px] text-gray-400">{date}</span></div><h3 className="font-bold text-white text-sm">Línea {d.linea} | U: {d.unidad}</h3><p className="text-[10px] text-gray-500 mt-1">Reportado por: {d.conductorName}</p><p className="text-[11px] text-gray-400 truncate mt-1"><MapPin size={10} className="inline mr-1"/>{d.ubicacionManual || 'Ubicación GPS'}</p></div>
                         </div>

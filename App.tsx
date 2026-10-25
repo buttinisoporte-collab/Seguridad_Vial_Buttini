@@ -311,9 +311,14 @@ const App: React.FC = () => {
             }
             const targetRisk = risks.find(r => r.id === relocatingSiniestroId);
             if (targetRisk) {
-                const updatedRisk = { ...targetRisk, position: { lat: latlng.lat, lng: latlng.lng } };
+                const newPos = { lat: latlng.lat, lng: latlng.lng };
+                const updatedRisk = { 
+                    ...targetRisk, 
+                    position: newPos,
+                    associatedRouteIds: findAssociatedRouteIds(newPos) 
+                };
                 setRisks(prev => prev.map(r => r.id === updatedRisk.id ? updatedRisk : r));
-                saveRiskToDB(updatedRisk).catch(()=>{}); setRelocatingSiniestroId(null); setFocusPosition({ lat: latlng.lat, lng: latlng.lng });
+                saveRiskToDB(updatedRisk).catch(()=>{}); setRelocatingSiniestroId(null); setFocusPosition(newPos);
                 return;
             }
             setRelocatingSiniestroId(null); return;
@@ -485,7 +490,7 @@ const App: React.FC = () => {
                     <MapFocusUpdater focusPosition={focusPosition} />
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
                     <MapBoundsUpdater routes={visibleRoutes} risks={visibleRisks} siniestros={visibleSiniestros} activeTab={activeTab} focusPosition={focusPosition} />
-                    {(activeTab === 'riskTypes' || activeTab === 'siniestros') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}
+                    {(activeTab === 'riskTypes' || activeTab === 'siniestros' || activeTab === 'novedades') && (currentUser?.isAdmin || (Array.isArray(currentUser?.allowedTabs) && currentUser.allowedTabs.includes(activeTab))) && <MapClickHandler onMapClick={handleMapClick} />}
 
                     {Array.isArray(visibleRoutes) && visibleRoutes.map(route => {
                         const path: LatLngExpression[][] =[];
@@ -514,7 +519,7 @@ const App: React.FC = () => {
                              <Marker key={risk.id} position={[risk.position.lat, risk.position.lng]} icon={icon}>
                                 <Tooltip permanent direction="top" offset={[0, -25]} className="bg-white/90 border border-gray-300 shadow-md font-bold text-[10px] py-1 px-2 rounded-md" opacity={0.9}>{riskType.name}</Tooltip>
                                 <Popup>
-                                    <div className="flex justify-between items-start mb-1 min-w-[250px]">
+                                    <div className="flex justify-between items-start mb-1 min-w-[340px]">
                                         <div>
                                             <div className="font-bold text-lg leading-tight" style={{ color: riskType.color }}>{risk.driverReportDetails ? risk.driverReportDetails.categoriaIRAM : riskType.name}</div>
                                             <div className="text-[10px] text-gray-500 uppercase tracking-wide">{risk.driverReportDetails ? 'Reporte Conductor' : (riskType.isIncident ? 'Siniestro' : 'Riesgo Vial')}</div>
@@ -528,12 +533,24 @@ const App: React.FC = () => {
                                     </div>
                                     
                                     {risk.driverReportDetails ? (
-                                        <div className="bg-gray-100 rounded-lg p-2 my-2 border border-gray-200">
-                                            <div className="grid grid-cols-2 gap-2 text-xs mb-2 pb-2 border-b border-gray-300">
-                                                <div className="flex items-center gap-1 text-gray-700 col-span-2 font-bold"><Bus size={12}/> Reportado por: {risk.driverReportDetails.conductorName}</div>
-                                                <div className="flex items-center gap-1 text-gray-700"><b>Línea:</b> {risk.driverReportDetails.linea}</div>
-                                                <div className="flex items-center gap-1 text-gray-700"><b>U.:</b> {risk.driverReportDetails.unidad}</div>
-                                                <div className="flex items-center gap-1 text-gray-700 col-span-2"><Navigation size={12}/> <b>Sentido:</b> {risk.driverReportDetails.sentido}</div>
+                                        <div className="bg-gray-100 rounded-lg p-3 my-2 border border-gray-200 shadow-sm">
+                                            <div className="flex flex-col gap-2 text-xs">
+                                                <div className="flex items-center gap-1 text-gray-800 font-bold"><Bus size={14}/> Reportado por: {risk.driverReportDetails.conductorName}</div>
+                                                <div className="flex flex-wrap items-center gap-2 text-gray-700 bg-white p-1.5 rounded border border-gray-200">
+                                                    <span><b>Línea:</b> {risk.driverReportDetails.linea}</span>
+                                                    <span className="text-gray-300">|</span>
+                                                    <span><b>U.:</b> {risk.driverReportDetails.unidad}</span>
+                                                    <span className="text-gray-300">|</span>
+                                                    <span className="flex items-center gap-1"><Navigation size={12}/> <b>Sentido:</b> {risk.driverReportDetails.sentido}</span>
+                                                </div>
+                                                {risk.description && risk.description !== `Reporte: ${riskType.name}` && (
+                                                    <div className="text-gray-700 italic bg-gray-50 p-2 rounded border border-gray-200">"{risk.description}"</div>
+                                                )}
+                                                {associatedRoutes.length > 0 && (
+                                                    <div className="text-[11px] text-sky-800 font-bold bg-sky-100 p-2 rounded border border-sky-200 mt-1">
+                                                        Afecta: {Array.from(new Set(associatedRoutes.map(r => r.line))).filter(Boolean).join(', ')}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ) : <p className="text-gray-700 text-sm mb-2">{risk.description}</p>}
